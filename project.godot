@@ -1,0 +1,49 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=4
+
+_global_script_classes=[ {
+"base": "Node2D",
+"class": "Grid",
+"language": "GDScript",
+"path": "res://addons/grid/Grid.gd"
+}, {
+"base": "Sprite",
+"class": "Tile",
+"language": "GDScript",
+"path": "res://addons/grid/Tile.gd"
+}, {
+"base": "Node",
+"class": "XScene",
+"language": "GDScript",
+"path": "res://addons/x_scene/x_scene.gd"
+} ]
+_global_script_class_icons={
+"Grid": "res://addons/grid/grid16.png",
+"Tile": "res://addons/grid/tile16.png",
+"XScene": ""
+}
+
+[application]
+
+config/name="godot-grid"
+run/main_scene="res://example/Main.tscn"
+config/icon="res://icon.png"
+
+[editor_plugins]
+
+enabled=PoolStringArray( "res://addons/grid/plugin.cfg", "res://addons/x_scene/plugin.cfg" )
+
+[physics]
+
+common/enable_pause_aware_picking=true
+
+[rendering]
+
+environment/default_environment="res://default_env.tres"

@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=2]
+
+[ext_resource path="res://addons/grid/Tile.gd" type="Script" id=1]
+[ext_resource path="res://icon.png" type="Texture" id=2]
+
+[node name="Tile2" type="Sprite"]
+modulate = Color( 0.862745, 0.0901961, 0.85098, 1 )
+texture = ExtResource( 2 )
+centered = false
+flip_v = true
+script = ExtResource( 1 )
