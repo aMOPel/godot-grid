@@ -1,5 +1,4 @@
 
-addons/x_scene
 # Godot-specific ignores
 .import/
 export.cfg
