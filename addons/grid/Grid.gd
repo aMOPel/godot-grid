@@ -2,31 +2,44 @@ extends Node2D
 
 class_name Grid, "res://addons/grid/grid16.png"
 
+# the number of rows the grid has. Applied on init.
 var row_max: int
+# the number of columns the grid has. Applied on init.
 var col_max: int
 
+# the pattern applied to the grid on init
 var pattern: Array
+# the distribution applied o the grid on init
 var distribution 
 
+# the calculated amount of tiles the grid contains. (row_max * col_max)
 var size: int
+# the length of the tile's x side
 var tile_x: float
+# the length of the tile's y side
 var tile_y: float
 
-# to group indices of rows and of columns together since they are constant
+# look up table, to group indices of rows and of columns together since they are constant
 var row_lut: Array
 var col_lut: Array
 
+# the coordinates of all tiles in a flat array. Indices are the tiles' grid_indices.
 var flat_coordinates: Array
 
+# mapping all the tiles' grid_indices to the tiles' tile_key.
 var map: Array
+# contains a dictionary mapping the tiles' tile_key to the scenes used for the tiles.
 var tiles:= {}
+# used for XScene for init and when switching
 var method_add: int
 var method_remove: int
 
+# the XScene instance that controls all tiles under Grid.
 onready var x := XScene.new(self, false)
 
 
 func _ready():
+	# infer tile_x and tile_y
 	if tile_x < 0 or tile_y < 0:
 		var t = tiles.values()[0].instance()
 		var cell_rect = t.get_rect()
@@ -45,6 +58,7 @@ func _ready():
 				'all tiles must be of the same dimensions'
 			)
 
+	# generate flat_coordinates and the luts
 	col_lut = []
 	row_lut = []
 	flat_coordinates = []
@@ -65,6 +79,7 @@ func _ready():
 
 	x.defaults.method_add = method_add
 
+	# make the map according to pattern/distribution/neither
 	map = []
 	if pattern:
 		map = make_map_for_pattern(pattern)
@@ -83,7 +98,8 @@ func _ready():
 
 
 
-# instance a grid with `_col_max` columns and `_row_max` rows. By default all tiles are visible and are set to `_tiles`[0]
+# instance a grid with `_col_max` columns and `_row_max` rows. By default all tiles are visible and are set to first element in `_tiles`
+# `_tiles` can be array or dictionary, but will be converted to dictionary.
 # Specify `_pattern` of tiles that is repeated through the whole grid. The numbers are the indices in the `_tiles` array
 # var pattern = [
 # 	[0, 1, 0, 1],
@@ -91,6 +107,7 @@ func _ready():
 # 	[0, 1, 0, 1],
 # ]
 # Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid.
+# `_distribution` can be dictionary or array, if you have only integers as keys in `_tiles`
 # var distribution = [0.5, 5, 2]
 # You can only specify either `_pattern` or `_distribution`
 # if `_tile_x` and `_tile_y` remain -1
@@ -129,6 +146,8 @@ func _init(
 
 
 # Switch the tile at grid_index to the tile of tile_key. The old tile is freed, no properties are kept, except the position.
+# `_method_to` and `_method_from` are used for `XScene.x_add_scene`
+# if they are -1, `Grid.method_add` and `.method_remove` are used
 func switch_tile_to(
 	grid_index: int, tile_key, _method_to := -1, _method_from := -1
 ) -> void:
@@ -176,6 +195,7 @@ func make_map_for_pattern(_pattern: Array) -> Array:
 
 
 # Makes an array of size grid.size, that maps tile indices from grid.tiles to grid indices, randomly distributed according to grid.distribution
+# takes dictionary or array, if you have only integers as keys in Grid.tiles
 func make_map_for_distribution(_distribution) -> Array:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()

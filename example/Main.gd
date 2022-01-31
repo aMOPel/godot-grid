@@ -1,27 +1,26 @@
 extends Node2D
 
-const col_max = 20
-const row_max = 20
-
 # godot icon
 onready var tile1 = preload("res://example/Tile1.tscn")
 # godot icon flipped and modulated pink
 onready var tile2 = preload("res://example/Tile2.tscn")
-# godot icon flipped and modulated brown
+# godot icon modulated brown
 onready var tile3 = preload("res://example/Tile3.tscn")
 
-var grid: Grid
 
 func _ready():
+	var col_max = 20
+	var row_max = 20
+	# this can also be an array if you dont care about the keys being describtive
 	var tiles = {'one': tile1, 'two': tile2, 'three': tile3}
-	grid = Grid.new(col_max, row_max, tiles)
+	var grid = Grid.new(col_max, row_max, tiles)
 	add_child(grid)
 
 	# operate on the whole grid at once
 	grid.modulate = Color.gray
 	grid.rotate(PI/8)
 
-	# access individual tiles by their index
+	# access individual tiles by their index (using XScene)
 	grid.x.x(5).modulate = Color.red
 
 	# use the static row/column index to access tiles by row/column
@@ -105,7 +104,7 @@ func _ready():
 	# as you can see this is a little confusing,
 	# thats why it's not the recommended method of accessing tiles
 
-	# also you can access the tile index of an individual tile
+	# also you can access the tile_key of an individual tile
 	print(grid2.x.x(0).tile_key) 
 	# remember grid2 is the grid with the cross pattern
 
@@ -115,5 +114,6 @@ func _ready():
 	# for tile in get_tree().get_nodes_in_group('column_five'):
 	# 	print(tile.index) # -> prints all indices of column 5
 
+	# you can get all tiles with the same tile_key like this
 	print(grid2.get_tiles_by_tile_key('three'))
 
