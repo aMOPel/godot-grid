@@ -152,6 +152,14 @@ func x(key) -> Node:
 		return null
 
 
+func d(key) -> Dictionary:
+	if _check_scene(key):
+		return scenes[key].data
+	else:
+		print_debug("XScene.d: returning empty dictionary, key invalid " + key as String)
+		return {}
+
+
 # do multiple "x"ess"s", get Array of Nodes based on `method` \
 # if null, return all scenes(nodes) from `scenes` \
 # if method specified, return only the scenes(nodes) in the respective state \
@@ -181,6 +189,24 @@ func xs(method = null) -> Array:
 	return a
 
 
+# uses PackedScene.instance() or Node.duplicate() on s
+func to_node(s) -> Node:
+	var n: Node
+	if s is PackedScene:
+		n = s.instance()
+	elif s is Node:
+		n = s.duplicate()
+	else:
+		assert(
+			false,
+			(
+				"XScene.to_node: s must be PackedScene or Node "
+				+ s.to_string()
+			)
+		)
+	return n
+
+
 # add a scene to the tree below `root` and to `scenes` \
 # `ACTIVE` uses `add_child()` \
 # `HIDDEN` uses `add_child()` and `.hide()` \
@@ -205,19 +231,8 @@ func add_scene( new_scene, key = count, method := defaults.method_add, deferred 
 		ACTIVE <= method and method <= STOPPED,
 		"XScene.add_scene: invalid method value " + method as String
 	)
-	var s: Node
-	if new_scene is PackedScene:
-		s = new_scene.instance()
-	elif new_scene is Node:
-		s = new_scene
-	else:
-		assert(
-			false,
-			(
-				"XScene.add_scene: new_scene must be PackedScene or Node "
-				+ new_scene.to_string()
-			)
-		)
+
+	var s: Node = to_node(new_scene)
 
 	if method != STOPPED:
 		_adding_scene = true
@@ -249,7 +264,7 @@ func add_scene( new_scene, key = count, method := defaults.method_add, deferred 
 			else:
 				s.hide()
 
-	scenes[key] = {scene = s, state = method}
+	scenes[key] = {scene = s, state = method, data = {}}
 
 
 # make `key` visible, and update `scenes` \
