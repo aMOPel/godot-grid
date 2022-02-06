@@ -91,6 +91,5 @@ To run the examples yourself, you can
   * you can open an issue if you're missing a feature
 
 ### Attributions
-<a href="https://www.flaticon.com/free-icons/shape" title="shape icons">Shape icons created by Dave Gandy - Flaticon</a>
 
 <a href="https://www.flaticon.com/free-icons/menu" title="menu icons">Menu icons created by Kiranshastry - Flaticon</a>

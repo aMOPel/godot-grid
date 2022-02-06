@@ -6,7 +6,7 @@ var row_max: int
 var col_max: int
 
 var pattern: Array
-var distribution 
+var distribution
 
 var size: int
 var tile_x: float
@@ -19,7 +19,7 @@ var col_lut: Array
 var flat_coordinates: Array
 
 var map: Array
-var tiles:= {}
+var tiles := {}
 var method_add: int
 var method_remove: int
 
@@ -27,23 +27,15 @@ onready var x := XScene.new(self, false)
 
 
 func _ready():
+	# if tile_x and tile_y are not given on init, they are inferred from Sprite.get_rect() in tiles[0]
 	if tile_x < 0 or tile_y < 0:
-		var t = tiles.values()[0].instance()
-		var cell_rect = t.get_rect()
+		var t = x.to_node(tiles.values()[0])
+		var sprite = find_sprite(t)
+		assert(sprite != null, 'The Grid tile size is unknown. tile_x and tile_y were not given on init and tiles[0] doesn\'t contain a Sprite')
+		var cell_rect = sprite.get_rect()
 		t.free()
 		tile_x = abs(cell_rect.position.x) + abs(cell_rect.end.x)
 		tile_y = abs(cell_rect.position.y) + abs(cell_rect.end.y)
-		# just to check the other tile sizes
-		for key in tiles:
-			t = tiles[key].instance()
-			cell_rect = t.get_rect()
-			t.free()
-			var _tile_x = abs(cell_rect.position.x) + abs(cell_rect.end.x)
-			var _tile_y = abs(cell_rect.position.y) + abs(cell_rect.end.y)
-			assert(
-				tile_x == _tile_x and tile_y == _tile_y,
-				'all tiles must be of the same dimensions'
-			)
 
 	col_lut = []
 	row_lut = []
@@ -59,7 +51,9 @@ func _ready():
 		for j in col_max:
 			row_lut[i].append(flat_coordinates.size())
 			col_lut[j].append(flat_coordinates.size())
-			flat_coordinates.append(Vector2(x_coord, y_coord))
+			flat_coordinates.append(
+				{position = Vector2(x_coord, y_coord), row = i, col = j}
+			)
 			x_coord += tile_x
 		y_coord += tile_y
 
@@ -76,11 +70,10 @@ func _ready():
 
 	for i in size:
 		x.add_scene(tiles[map[i]])
-		x.x(i).tile_key = map[i]
-		x.x(i).position += flat_coordinates[i]
-		x.x(i).grid_index = i
-
-
+		x.x(i).position += flat_coordinates[i].position
+		x.d(i).row = flat_coordinates[i].row
+		x.d(i).col = flat_coordinates[i].col
+		x.d(i).tile_key = map[i]
 
 
 # instance a grid with `_col_max` columns and `_row_max` rows. By default all tiles are visible and are set to `_tiles`[0]
@@ -132,6 +125,8 @@ func _init(
 func switch_tile_to(
 	grid_index: int, tile_key, _method_to := -1, _method_from := -1
 ) -> void:
+	var row = x.d(grid_index).row
+	var col = x.d(grid_index).col
 	x.x_add_scene(
 		tiles[tile_key],
 		grid_index,
@@ -139,9 +134,10 @@ func switch_tile_to(
 		method_add if _method_to < 0 else _method_to,
 		method_remove if _method_from < 0 else _method_from
 	)
-	x.x(grid_index).position = flat_coordinates[grid_index]
-	x.x(grid_index).grid_index = grid_index
-	x.x(grid_index).tile_key = tile_key
+	x.x(grid_index).position = flat_coordinates[grid_index].position
+	x.d(grid_index).tile_key = tile_key
+	x.d(grid_index).row = row
+	x.d(grid_index).col = col
 
 
 # Makes an array of size grid.size, that maps tile indices from grid.tiles to grid indices according to grid.pattern
@@ -212,7 +208,7 @@ func make_map_for_distribution(_distribution) -> Array:
 func get_tiles_by_tile_key(_tile_key) -> Array:
 	var ts = []
 	for i in size:
-		if _tile_key == x.x(i).tile_key:
+		if _tile_key == x.d(i).tile_key:
 			ts.append(i)
 	return ts
 
@@ -220,10 +216,22 @@ func get_tiles_by_tile_key(_tile_key) -> Array:
 # Create a Rect2 encompassing the whole grid. It uses coordinates local to the grid.
 func get_rect() -> Rect2:
 	var last_tile = x.x(size - 1)
-	return Rect2(
-		position,
-		(
-			last_tile.get_relative_transform_to_parent(self).origin
-			+ last_tile.get_rect().end
-		)
+	var start = transform.origin
+	var end = (
+		last_tile.get_relative_transform_to_parent(self).origin
+		+ Vector2(tile_x, tile_y)
 	)
+	return Rect2(start, end)
+
+
+func find_sprite(parent: Node) -> Node:
+	if parent is Sprite:
+		return parent
+	else:
+		var sprite = null
+		for c in parent.get_children():
+			var temp = find_sprite(c)
+			if temp != null:
+				sprite = temp
+				break
+		return sprite

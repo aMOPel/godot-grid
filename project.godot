@@ -14,11 +14,6 @@ _global_script_classes=[ {
 "language": "GDScript",
 "path": "res://addons/grid/Grid.gd"
 }, {
-"base": "Sprite",
-"class": "Tile",
-"language": "GDScript",
-"path": "res://addons/grid/Tile.gd"
-}, {
 "base": "Node",
 "class": "XScene",
 "language": "GDScript",
@@ -26,7 +21,6 @@ _global_script_classes=[ {
 } ]
 _global_script_class_icons={
 "Grid": "res://addons/grid/grid16.png",
-"Tile": "res://addons/grid/tile16.png",
 "XScene": ""
 }
 
