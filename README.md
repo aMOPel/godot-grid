@@ -20,7 +20,7 @@ __Make patterns:__
 __Easily work with Columns, Rows and Diagonals:__
 ![](./tutorial/pics/readme_moving_neighbors.gif)
 
-## [Tutorial](./tutorial/tutorial.md) (to see all Features)
+## [Tutorial](./tutorial/README.md) (to see all Features)
 
 ### Applications
 It's supposed to be useful when you have some sort of rectangular grid based system in your game.
@@ -40,7 +40,7 @@ So this library is intended for comparativly small Grids.
 
 Some features just use static information and thus are quite fast (the look up tables).
 But others generate Arrays depending on the input and can become quite sluggish, when those arrays get too big.
-See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/tutorial.md)
+See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/README.md)
 
 You could circumvent this limitation by implementing some form of clustering or culling for the tiles in order to only calculate whats on/close to the screen.
 See [Future Feature Ideas](#Future Feature Ideas)
