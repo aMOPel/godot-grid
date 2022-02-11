@@ -110,10 +110,17 @@ func _ready():
 ```
 ![](./pics/access_by_tile_key.png)
 
-## Access relative to one Tile
+## Access relative to a Tile
 ### Location
 
-`partial_location` can be `grid_index: int` or `grid_position: Vector2` or `{grid_index: int}` or `{grid_position: Vector2}` or `{grid_index: int, grid_position: Vector2}`
+The location system allows you to specify a tile by its `grid_index` or by its col/row
+
+`partial_location` can be
+  * `grid_index: int` or 
+  * `grid_position: Vector2` or 
+  * `{grid_index: int}` or `{grid_position: Vector2}` or 
+  * `{grid_index: int, grid_position: Vector2}`
+
 `location` is `{grid_index: int, grid_position: Vector2}`
 
 ```gdscript
@@ -203,10 +210,10 @@ func _ready():
 For detailed information see the [XScene repository](https://github.com/aMOPel/godot-xchange-scene)
 
 Basicly XScene lets you alter the state of a scene between 
-	* ACTIVE == in the tree and visible
-	* HIDDEN == in the tree but `.visible == false`
-	* STOPPED == not in the tree but still in memory
-	* FREE == no longer in memory
+  * ACTIVE == in the tree and visible
+  * HIDDEN == in the tree but `.visible == false`
+  * STOPPED == not in the tree but still in memory
+  * FREE == no longer in memory
 Godot already provides this functionality obviously, but XScene abstracts it and provides a higher level API.
 And since XScene indexes the managed nodes with their respective states, you can access nodes grouped by state.
 
@@ -278,12 +285,15 @@ A possible future feature.
 
 	for i in rect:
 		grid.x.x(i).modulate = Color.green
+
+  # the corners are modulated red afterwards
 ```
 ![](./pics/utility_rect.png)
 
 ```gdscript
 	grid.rotate(PI/8)
 
+  # get a Rect2 encompassing the whole grid
 	var rect = grid.get_rect()
 	var lower_right_corner = grid.to_global(rect.end)
 	# put a tile at the lower right corner

@@ -23,8 +23,6 @@ number of cols/rows in the grid
 var pattern: Array
 ```
 
-- **Setter**: `set_pattern`
-
 pattern of `tile_key`s that is applied to the grid \
 setting this variable is expensive as it resets the whole grid
 
@@ -33,8 +31,6 @@ setting this variable is expensive as it resets the whole grid
 ```gdscript
 var distribution
 ```
-
-- **Setter**: `set_distribution`
 
 distribution of `tile_key`s that is applied to the grid \
 can be Array if `tile_key`s are int or dictionary if `tile_key`s are String \
@@ -45,8 +41,6 @@ setting this variable is expensive as it resets the whole grid
 ```gdscript
 var map: Array
 ```
-
-- **Setter**: `set_map`
 
 maps `grid_index` to `tile_key` \
 setting this variable is expensive as it resets the whole grid
@@ -74,7 +68,7 @@ using normal coordinates, not grid coordinates
 var row_lut: Array
 ```
 
-groups indices of rows and of columns together for easy access, since they are constant \
+groups indices of rows together for easy access, since they are constant \
 Array of Arrays containing `grid_indices`
 
 ### col\_lut
@@ -83,13 +77,16 @@ Array of Arrays containing `grid_indices`
 var col_lut: Array
 ```
 
+groups indices of columns together for easy access, since they are constant \
+Array of Arrays containing `grid_indices`
+
 ### falling\_diag\_lut
 
 ```gdscript
 var falling_diag_lut: Array
 ```
 
-groups indices of rising and falling diagonals together for easy access, since they are constant
+groups indices of falling diagonals together for easy access, since they are constant \
 Array of Arrays containing `grid_indices`
 
 ### rising\_diag\_lut
@@ -98,6 +95,9 @@ Array of Arrays containing `grid_indices`
 var rising_diag_lut: Array
 ```
 
+groups indices of rising diagonals together for easy access, since they are constant \
+Array of Arrays containing `grid_indices`
+
 ### g
 
 ```gdscript
@@ -105,7 +105,7 @@ var g: Array
 ```
 
 holds information for all tiles in the grid \
-`g` at `grid_index` is `{position: Vector2, tile_key: int/string, row: int, col: int}`
+`g` at `grid_index` is `{position: Vector2, tile_key: int/string, grid_position: Vector2, rising_diag: int, falling_diag:int}`
 
 ### tiles
 
@@ -129,33 +129,23 @@ defaults for `XScene.defaults`, only set once in `_ready()`
 var x: XScene
 ```
 
-instance of `XScene`
+instance of `XScene`, managing all tiles of the grid
 
 ## Method Descriptions
-
-### set\_pattern
-
-```gdscript
-func set_pattern(new: Array) -> void
-```
-
-### set\_distribution
-
-```gdscript
-func set_distribution(new) -> void
-```
-
-### set\_map
-
-```gdscript
-func set_map(new: Array) -> void
-```
 
 ### \_init
 
 ```gdscript
 func _init(_dimensions: Vector2, _tiles, _pattern: Array, _distribution, _tile_dimensions: Vector2 = "(0, 0)", _args: Dictionary)
 ```
+
+instance a grid with `_dimensions.x` columns and `_dimensions.y` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
+Specify `_pattern` of tiles. A matrix of `tile_key`s that is repeated through the whole grid. \
+Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
+You can only specify either `_pattern` or `_distribution` \
+`if _tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
+`else`: It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
+`args` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation
 
 ### to\_location
 
@@ -177,7 +167,7 @@ change the tile at `partial_location` \
 `changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
 `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-`if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()`
+`if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()` \
 `args` are send through to XScene, see XScene for documentation
 
 ### switch\_tile
@@ -195,6 +185,11 @@ The old tile is freed, no properties are kept, except the position. \
 ```gdscript
 func move_tile(partial_location_to, partial_location_from, leave_behind = null, args: Dictionary) -> void
 ```
+
+Move the tile at `partial_location_from` to `partial_location_to`. \
+`if leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
+`else`: it uses `leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
+`args` are send through to XScene, see XScene for documentation
 
 ### make\_map\_for\_pattern
 
@@ -241,7 +236,7 @@ func get_orthogonal_neighbors(partial_location, distance: int = 1, rings: bool =
 
 returns an Array containing the `grid_indices` of the tiles in the same row and column as `partial_location` \
 `if rings`: see `get_rings_around()`, but only with tiles in same row and column \
-distance determines how many rings are returned \
+`distance` determines how many rings are returned \
 `if distance == -1`: it returns all rings
 
 ### get\_diagonal\_neighbors
@@ -278,7 +273,7 @@ containing the differences between `partial_location_to` and `partial_location_f
 func get_rect_between(partial_location_to, partial_location_from) -> Array
 ```
 
-returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `partial_location_to` and `partial_location_from` \
+returns an Array containing the `grid_indices` of all tiles in the rectangle between and including `partial_location_to` and `partial_location_from` \
 the order of the inputs does not matter
 
 ### get\_tiles\_by\_tile\_key
@@ -295,5 +290,5 @@ get Array of tiles with the specified `tile_key`
 func get_rect() -> Rect2
 ```
 
-create a Rect2 encompassing the whole grid \
+create a `Rect2` encompassing the whole grid \
 it uses coordinates local to the grid

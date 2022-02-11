@@ -40,7 +40,7 @@ So this library is intended for comparativly small Grids.
 
 Some features just use static information and thus are quite fast (the look up tables).
 But others generate Arrays depending on the input and can become quite sluggish, when those arrays get too big.
-See ['Access relative to one Tile' Chapter in the Tutorial](./tutorial/tutorial.md)
+See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/tutorial.md)
 
 You could circumvent this limitation by implementing some form of clustering or culling for the tiles in order to only calculate whats on/close to the screen.
 See [Future Feature Ideas](#Future Feature Ideas)

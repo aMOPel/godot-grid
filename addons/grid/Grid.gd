@@ -10,16 +10,16 @@ var dimensions: Vector2
 
 # pattern of `tile_key`s that is applied to the grid \
 # setting this variable is expensive as it resets the whole grid
-var pattern: Array setget set_pattern
+var pattern: Array setget _set_pattern
 
 # distribution of `tile_key`s that is applied to the grid \
 # can be Array if `tile_key`s are int or dictionary if `tile_key`s are String \
 # setting this variable is expensive as it resets the whole grid
-var distribution setget set_distribution
+var distribution setget _set_distribution
 
 # maps `grid_index` to `tile_key` \
 # setting this variable is expensive as it resets the whole grid
-var map: Array setget set_map
+var map: Array setget _set_map
 
 # number of tiles in grid
 var size: int
@@ -28,18 +28,24 @@ var size: int
 # using normal coordinates, not grid coordinates
 var tile_dimensions: Vector2
 
-# groups indices of rows and of columns together for easy access, since they are constant \
+# groups indices of rows together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
 var row_lut: Array
+
+# groups indices of columns together for easy access, since they are constant \
+# Array of Arrays containing `grid_indices`
 var col_lut: Array
 
-# groups indices of rising and falling diagonals together for easy access, since they are constant
+# groups indices of falling diagonals together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
 var falling_diag_lut: Array
+
+# groups indices of rising diagonals together for easy access, since they are constant \
+# Array of Arrays containing `grid_indices`
 var rising_diag_lut: Array
 
 # holds information for all tiles in the grid \
-# `g` at `grid_index` is `{position: Vector2, tile_key: int/string, row: int, col: int}`
+# `g` at `grid_index` is `{position: Vector2, tile_key: int/string, grid_position: Vector2, rising_diag: int, falling_diag:int}`
 var g: Array setget _dont_set
 
 # keys are `tile_key`, values are Node/PackedScene
@@ -48,7 +54,7 @@ var tiles := {}
 # defaults for `XScene.defaults`, only set once in `_ready()`
 var args: Dictionary setget _dont_set
 
-# instance of `XScene`
+# instance of `XScene`, managing all tiles of the grid
 var x: XScene
 
 
@@ -56,17 +62,17 @@ func _dont_set(a) -> void:
 	assert(false, 'Grid: do not set g property manually')
 
 
-func set_pattern(new: Array) -> void:
+func _set_pattern(new: Array) -> void:
 	pattern = new
 	self.map = make_map_for_pattern(pattern)
 
 
-func set_distribution(new) -> void:
+func _set_distribution(new) -> void:
 	distribution = new
 	self.map = make_map_for_distribution(distribution)
 
 
-func set_map(new: Array) -> void:
+func _set_map(new: Array) -> void:
 	map = new
 	for i in size:
 		switch_tile({grid_index = i}, map[i])
@@ -182,19 +188,10 @@ func _ready():
 # Specify `_pattern` of tiles. A matrix of `tile_key`s that is repeated through the whole grid. \
 # Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
 # You can only specify either `_pattern` or `_distribution` \
-# `if _tile_dimensions == Vector2.ZERO`: \
-#		The size of the icon is inferred \
-# `else`: \
-#		It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
-# `args` are send through to `XScene.new()`, see XScene for documentation
-func _init(
-	_dimensions: Vector2,
-	_tiles,
-	_pattern := [],
-	_distribution = {},
-	_tile_dimensions := Vector2.ZERO,
-	_args := {}
-):
+# `if _tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
+# `else`: It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
+# `args` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation
+func _init(_dimensions: Vector2, _tiles, _pattern := [], _distribution = {}, _tile_dimensions := Vector2.ZERO, _args := {}):
 	dimensions = _dimensions
 
 	size = _dimensions.x * _dimensions.y
@@ -265,7 +262,7 @@ func to_location(partial_location) -> Dictionary:
 # `changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
 # `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 # `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-# `if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()`
+# `if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()` \
 # `args` are send through to XScene, see XScene for documentation
 func change_tile(partial_location, changes: Dictionary, args := {}) -> void:
 	var location = to_location(partial_location)
@@ -318,9 +315,7 @@ func switch_tile(partial_location, tile_key, args := {}) -> void:
 # `if leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
 # `else`: it uses `leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
 # `args` are send through to XScene, see XScene for documentation
-func move_tile(
-	partial_location_to, partial_location_from, leave_behind = null, args := {}
-) -> void:
+func move_tile(partial_location_to, partial_location_from, leave_behind = null, args := {}) -> void:
 	var location_to := to_location(partial_location_to)
 	var location_from := to_location(partial_location_from)
 
@@ -531,7 +526,7 @@ func get_rings_around(partial_location, distance := 1) -> Array:
 
 # returns an Array containing the `grid_indices` of the tiles in the same row and column as `partial_location` \
 # `if rings`: see `get_rings_around()`, but only with tiles in same row and column \
-# distance determines how many rings are returned \
+# `distance` determines how many rings are returned \
 # `if distance == -1`: it returns all rings
 func get_orthogonal_neighbors(partial_location, distance := 1, rings := false) -> Array:
 	var location := to_location(partial_location)
@@ -710,7 +705,7 @@ func get_distance_between(partial_location_to, partial_location_from) -> Diction
 	return distance
 
 
-# returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `partial_location_to` and `partial_location_from` \
+# returns an Array containing the `grid_indices` of all tiles in the rectangle between and including `partial_location_to` and `partial_location_from` \
 # the order of the inputs does not matter
 func get_rect_between(partial_location_to, partial_location_from) -> Array:
 	var location_from := to_location(partial_location_from)
@@ -746,7 +741,7 @@ func get_tiles_by_tile_key(_tile_key) -> Array:
 	return ts
 
 
-# create a Rect2 encompassing the whole grid \
+# create a `Rect2` encompassing the whole grid \
 # it uses coordinates local to the grid
 func get_rect() -> Rect2:
 	var last_tile = x.x(size - 1)
