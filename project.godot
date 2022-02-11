@@ -27,7 +27,7 @@ _global_script_class_icons={
 [application]
 
 config/name="godot-grid"
-run/main_scene="res://example/Main.tscn"
+run/main_scene="res://tutorial/Main.tscn"
 config/icon="res://icon.png"
 
 [editor_plugins]

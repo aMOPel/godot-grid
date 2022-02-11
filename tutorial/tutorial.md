@@ -8,11 +8,11 @@ __Variables that aren't defined in the code snippets are defined in previous cod
 ```gdscript
 
 # godot icon
-onready var tile1 = preload("res://example/Tile1.tscn")
+onready var tile1 = preload("res://tutorial/Tile1.tscn")
 # godot icon flipped and modulated pink
-onready var tile2 = preload("res://example/Tile2.tscn")
+onready var tile2 = preload("res://tutorial/Tile2.tscn")
 # godot icon modulated brown
-onready var tile3 = preload("res://example/Tile3.tscn")
+onready var tile3 = preload("res://tutorial/Tile3.tscn")
 
 var grid: Grid
 
