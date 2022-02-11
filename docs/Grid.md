@@ -8,21 +8,14 @@
 
 ## Property Descriptions
 
-### row\_max
+### dimensions
 
 ```gdscript
-var row_max: int
+var dimensions: Vector2
 ```
 
-number of rows in the grid
-
-### col\_max
-
-```gdscript
-var col_max: int
-```
-
-number of columns in the grid
+dimensions of the grid \
+number of cols/rows in the grid
 
 ### pattern
 
@@ -66,19 +59,14 @@ var size: int
 
 number of tiles in grid
 
-### tile\_x
+### tile\_dimensions
 
 ```gdscript
-var tile_x: float
+var tile_dimensions: Vector2
 ```
 
-side length of an individual tile
-
-### tile\_y
-
-```gdscript
-var tile_y: float
-```
+dimensions of an individual tile \
+using normal coordinates, not grid coordinates
 
 ### row\_lut
 
@@ -86,7 +74,8 @@ var tile_y: float
 var row_lut: Array
 ```
 
-groups indices of rows and of columns together for easy access, since they are constant
+groups indices of rows and of columns together for easy access, since they are constant \
+Array of Arrays containing `grid_indices`
 
 ### col\_lut
 
@@ -101,6 +90,7 @@ var falling_diag_lut: Array
 ```
 
 groups indices of rising and falling diagonals together for easy access, since they are constant
+Array of Arrays containing `grid_indices`
 
 ### rising\_diag\_lut
 
@@ -164,46 +154,46 @@ func set_map(new: Array) -> void
 ### \_init
 
 ```gdscript
-func _init(_col_max: int, _row_max: int, _tiles, _pattern: Array, _distribution, _tile_x: int = -1, _tile_y: int = -1, _args: Dictionary)
+func _init(_dimensions: Vector2, _tiles, _pattern: Array, _distribution, _tile_dimensions: Vector2 = "(0, 0)", _args: Dictionary)
 ```
 
-### location\_to\_grid\_index
+### to\_location
 
 ```gdscript
-func location_to_grid_index(location) -> int
+func to_location(partial_location) -> Dictionary
 ```
 
-`location` can be `grid_index: int` or `{grid_index: int}` or `{row: int, col: int}` \
-`grid_index` takes precedence over row/col \
-it returns the corresponding `grid_index` as int
+`partial_location` can be `grid_index: int` or `grid_position: Vector2` or `{grid_index: int}` or `{grid_position: Vector2}` or `{grid_index: int, grid_position: Vector2}` \
+`grid_index` takes precedence over `grid_position` \
+it returns the corresponding `location` `{grid_index: int, grid_position: Vector2}`
 
 ### change\_tile
 
 ```gdscript
-func change_tile(location, changes: Dictionary, args: Dictionary) -> void
+func change_tile(partial_location, changes: Dictionary, args: Dictionary) -> void
 ```
 
-change the tile at `location` \
-`changes` can contain these keys: `{tile_key: int, state: int, location:{(grid_index: int) or (row: int, col: int)}, leave_behind: int}` \
+change the tile at `partial_location` \
+`changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
 `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-`if changes.location`: `move_tile()` is used to move to `changes.location`, also `changes.leave_behind` is passed to `move_tile()`
+`if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()`
 `args` are send through to XScene, see XScene for documentation
 
 ### switch\_tile
 
 ```gdscript
-func switch_tile(location, tile_key, args: Dictionary) -> void
+func switch_tile(partial_location, tile_key, args: Dictionary) -> void
 ```
 
-Switch the tile at `location` to the tile of `tile_key`. \
+Switch the tile at `partial_location` to the tile of `tile_key`. \
 The old tile is freed, no properties are kept, except the position. \
 `args` are send through to XScene, see XScene for documentation
 
 ### move\_tile
 
 ```gdscript
-func move_tile(location_to: Dictionary, location_from: Dictionary, leave_behind = null, args: Dictionary) -> void
+func move_tile(partial_location_to, partial_location_from, leave_behind = null, args: Dictionary) -> void
 ```
 
 ### make\_map\_for\_pattern
@@ -225,10 +215,10 @@ Makes an array of size `grid.size`, that maps `tile_key` from `grid.tiles` to `g
 ### get\_cols\_rows\_around
 
 ```gdscript
-func get_cols_rows_around(location, distance: int = -1) -> Dictionary
+func get_cols_rows_around(partial_location, distance: int = -1) -> Dictionary
 ```
 
-get row indices and col indices around `location` depending on `distance` \
+get row indices and col indices around `partial_location` depending on `distance` \
 `if distance == -1`: get all rows/cols \
 returns `{rows = {above: Array, below: Array}, cols = {left: Array, right: Array}}` \
 the Arrays are ordered "closest to `location`" first
@@ -236,20 +226,20 @@ the Arrays are ordered "closest to `location`" first
 ### get\_rings\_around
 
 ```gdscript
-func get_rings_around(location, distance: int = 1) -> Array
+func get_rings_around(partial_location, distance: int = 1) -> Array
 ```
 
-returns an Array containing Arrays containing the `grid_indices` of the tiles in the next 'ring' around location \
+returns an Array of Arrays containing the `grid_indices` of the tiles in the next 'ring' around `partial_location` \
 `distance` determines how many rings are returned \
 `if distance == -1`: it returns all rings
 
 ### get\_orthogonal\_neighbors
 
 ```gdscript
-func get_orthogonal_neighbors(location, distance: int = 1, rings: bool = false) -> Array
+func get_orthogonal_neighbors(partial_location, distance: int = 1, rings: bool = false) -> Array
 ```
 
-returns an Array containing the `grid_indices` of the tiles in the same row and column as `location` \
+returns an Array containing the `grid_indices` of the tiles in the same row and column as `partial_location` \
 `if rings`: see `get_rings_around()`, but only with tiles in same row and column \
 distance determines how many rings are returned \
 `if distance == -1`: it returns all rings
@@ -257,10 +247,10 @@ distance determines how many rings are returned \
 ### get\_diagonal\_neighbors
 
 ```gdscript
-func get_diagonal_neighbors(location, distance: int = 1, rings: bool = false) -> Array
+func get_diagonal_neighbors(partial_location, distance: int = 1, rings: bool = false) -> Array
 ```
 
-returns an Array containing the `grid_indices` of the tiles on the same diagonals as location \
+returns an Array containing the `grid_indices` of the tiles on the same diagonals as `partial_location` \
 `if rings`: see `get_rings_around()`, but only with tiles on same diagonals \
 `distance` determines how many rings are returned \
 `if distance == -1`: it returns all rings
@@ -268,7 +258,7 @@ returns an Array containing the `grid_indices` of the tiles on the same diagonal
 ### get\_all\_neighbors
 
 ```gdscript
-func get_all_neighbors(location, distance: int = 1, rings: bool = false) -> Array
+func get_all_neighbors(partial_location, distance: int = 1, rings: bool = false) -> Array
 ```
 
 combines `get_orthogonal_neighbors()` and `get_diagonal_neighbors()`
@@ -276,19 +266,19 @@ combines `get_orthogonal_neighbors()` and `get_diagonal_neighbors()`
 ### get\_distance\_between
 
 ```gdscript
-func get_distance_between(start_location, end_location) -> Dictionary
+func get_distance_between(partial_location_to, partial_location_from) -> Dictionary
 ```
 
-returns a location Dictionary, containing the differences between `start_location` and `end_location` \
-`{grid_index:int, row:int, col:int}`
+returns a location Dictionary, see `to_location()`, \
+containing the differences between `partial_location_to` and `partial_location_from` \
 
 ### get\_rect\_between
 
 ```gdscript
-func get_rect_between(start_location, end_location) -> Array
+func get_rect_between(partial_location_to, partial_location_from) -> Array
 ```
 
-returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `start_location` and `end_location` \
+returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `partial_location_to` and `partial_location_from` \
 the order of the inputs does not matter
 
 ### get\_tiles\_by\_tile\_key

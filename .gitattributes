@@ -6,10 +6,9 @@
 /project.godot      export-ignore
 /icon.png           export-ignore
 /icon.svg           export-ignore
-/example            export-ignore
+/tutorial            export-ignore
 /test               export-ignore
 /addons/gut               export-ignore
-/addons/x_scene               export-ignore
 /docs   export-ignore
 grid64.png         export-ignore
 grid64.png.import         export-ignore

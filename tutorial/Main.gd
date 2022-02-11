@@ -7,27 +7,21 @@ onready var tile2 = preload("res://example/Tile2.tscn")
 # godot icon modulated brown
 onready var tile3 = preload("res://example/Tile3.tscn")
 
+var grid: Grid
 
 func _ready():
 	var tiles = {'one': tile1.instance(), 'two': tile2, 'three': tile3}
-	grid = Grid.new(10, 10, tiles)
+	grid = Grid.new(Vector2(10, 10), tiles)
 	add_child(grid)
 
+	var partial_location = Vector2(2, 5)
+	var location = grid.to_location(partial_location)
 
-	# var location = {row = 5, col = 2}
-	# var grid_index = grid.location_to_grid_index(location)
-	# grid.x.x(grid_index).modulate = Color.red
+	var partial_location_to = Vector2(9, 9)
 
-	grid.rotate(PI/8)
-
-	var rect = grid.get_rect()
-	var lower_right_corner = grid.to_global(rect.end)
-	# put a tile at the lower right corner
-	var t = tile1.instance()
-	add_child(t)
-	t.position = lower_right_corner
-
-
+	grid.change_tile(partial_location, {tile_key='two', state=XScene.HIDDEN, location=partial_location_to})
+	grid.x.show_scenes(grid.x.hidden)
+	# grid.x.show_scenes(row)
 
 	# test(location)
 	# grid.x.x(grid.location_to_grid_index(location)).modulate = Color.green
@@ -63,7 +57,7 @@ func _ready():
 # 	if event.is_action_pressed('ui_down'):
 # 		location.row += 1
 # 		yep = true
-# 	if (location.col >= grid.col_max or location.row >= grid.row_max
+# 	if (location.col >= grid.dimensions.x or location.row >= grid.dimensions.y
 # 	or location.col < 0 or location.row < 0):
 # 		location = temp
 # 	if yep:
@@ -165,7 +159,7 @@ func _ready():
 	# var grid3 = Grid.new(10, 10, tiles, [], distribution)
 	# add_child(grid3)
 	# grid3.rotate(-PI/2+PI/8)
-	# var half_height = grid.to_global(Vector2(rect.position.x,rect.end.y/2 + grid.tile_y))
+	# var half_height = grid.to_global(Vector2(rect.position.x,rect.end.y/2 + grid.tile_dimensions.y))
 	# grid3.translate(upper_right_corner + half_height)
 	#
 	# # you can access the tile_key of an individual tile
