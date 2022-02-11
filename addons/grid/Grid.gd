@@ -1,8 +1,8 @@
+# A gdscript library to make working with rectangular grids easier.
+
 extends Node2D
 
 class_name Grid, 'res://addons/grid/grid16.png'
-
-# TODO: think about making cols and rows to Vector2.x and .y
 
 # dimensions of the grid \
 # number of cols/rows in the grid

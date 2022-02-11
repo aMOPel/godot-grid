@@ -12,10 +12,10 @@ var location = Vector2(5, 5)
 
 func _ready():
 	var tiles = {'one': tile1.instance(), 'two': tile2, 'three': tile3}
-	grid = Grid.new(Vector2(240, 240), tiles)
+	grid = Grid.new(Vector2(200, 200), tiles)
 	add_child(grid)
 
-	test(location)
+	test()
 	# grid.x.x(grid.location_to_grid_index(location)).modulate = Color.green
 	# var loc2 = {row=0, col=9}
 	# for i in grid.get_area_between(location, loc2):
@@ -53,10 +53,10 @@ func _input(event):
 	or location.x < 0 or location.y < 0):
 		location = temp
 	if yep:
-		test(location)
+		test()
 		grid.x.x(grid.to_location(location).grid_index).modulate = Color.green
 
-func test(location):
+func test():
 	var color = Color.white
 	for i in grid.g.size():
 		grid.x.x(i).modulate = color

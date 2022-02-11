@@ -6,6 +6,8 @@
 
 ## Description
 
+A gdscript library to make working with rectangular grids easier.
+
 ## Property Descriptions
 
 ### dimensions

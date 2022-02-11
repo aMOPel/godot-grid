@@ -22,7 +22,7 @@ __Easily work with Columns, Rows and Diagonals:__
 
 ## [Tutorial](./tutorial/README.md) (to see all Features)
 
-### Applications
+## Applications
 It's supposed to be useful when you have some sort of rectangular grid based system in your game.
 
   * tetris
@@ -32,7 +32,7 @@ It's supposed to be useful when you have some sort of rectangular grid based sys
   * grid based turn based combat maybe
   * ...
 
-### Performance
+## Performance
 
 Since every Tile is a Node (with potential children), you will get lags from 10k nodes upwards depending on the machine.
 
@@ -45,7 +45,7 @@ See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/README.md)
 You could circumvent this limitation by implementing some form of clustering or culling for the tiles in order to only calculate whats on/close to the screen.
 See [Future Feature Ideas](#Future Feature Ideas)
 
-### Installation
+## Installation
 
 _Made with Godot version 3.4.2.stable.official.45eaa2daf_
 
@@ -56,20 +56,22 @@ This repo is in a __Godot Plugin format__.
 
 You can:
 <!-- - (Not yet) Install it via [__AssetLib__](https://godotengine.org/asset-library/asset/1018) or -->
-- Download a __.zip__ of this repo and put it in your project
+- [Download](https://github.com/aMOPel/godot-grid/archive/refs/heads/master.zip)
+   the __.zip__ of this repo and unpack it into your project, __currently XScene is included in the .zip__
+
 
 For more details, read the [godot docs on installing Plugins
 ](https://docs.godotengine.org/en/stable/tutorials/plugins/editor/installing_plugins.html)
 
 __Don't forget to enable it in your project settings!__
 
-### Future Feature Ideas
+## Future Feature Ideas
 
   * support for hex grid
   * support for triangular grid
   * support for clustering/culling to stop tiles not on screen and improve performance for huge grids
   * you can open an issue if you're missing a feature
 
-### Attributions
+## Attributions
 
 <a href="https://www.flaticon.com/free-icons/menu" title="menu icons">Menu icons created by Kiranshastry - Flaticon</a>
