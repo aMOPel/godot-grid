@@ -28,6 +28,7 @@ var size: int
 
 # side length of an individual tile
 var tile_x: float
+# the length of the tile's y side
 var tile_y: float
 
 # groups indices of rows and of columns together for easy access, since they are constant \

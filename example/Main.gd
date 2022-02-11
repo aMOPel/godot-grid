@@ -1,16 +1,12 @@
 extends Node2D
 
-const col_max = 20
-const row_max = 20
-
 # godot icon
 onready var tile1 = preload("res://example/Tile1.tscn")
 # godot icon flipped and modulated pink
 onready var tile2 = preload("res://example/Tile2.tscn")
-# godot icon flipped and modulated brown
+# godot icon modulated brown
 onready var tile3 = preload("res://example/Tile3.tscn")
 
-var grid: Grid
 
 func _ready():
 	var tiles = {'one': tile1.instance(), 'two': tile2, 'three': tile3}
