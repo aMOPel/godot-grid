@@ -4,11 +4,9 @@ class_name Grid, 'res://addons/grid/grid16.png'
 
 # TODO: think about making cols and rows to Vector2.x and .y
 
-# number of rows in the grid
-var row_max: int
-
-# number of columns in the grid
-var col_max: int
+# dimensions of the grid \
+# number of cols/rows in the grid
+var dimensions: Vector2
 
 # pattern of `tile_key`s that is applied to the grid \
 # setting this variable is expensive as it resets the whole grid
@@ -26,10 +24,9 @@ var map: Array setget set_map
 # number of tiles in grid
 var size: int
 
-# side length of an individual tile
-var tile_x: float
-# the length of the tile's y side
-var tile_y: float
+# dimensions of an individual tile \
+# using normal coordinates, not grid coordinates
+var tile_dimensions: Vector2
 
 # groups indices of rows and of columns together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
@@ -77,39 +74,42 @@ func set_map(new: Array) -> void:
 
 func _ready():
 	x = XScene.new(self, false, args)
-	# if tile_x and tile_y are not given on init, they are inferred from Sprite.get_rect() in tiles[0]
-	if tile_x < 0 or tile_y < 0:
+	# if tile_dimensions.x and tile_dimensions.y are not given on init, they are inferred from Sprite.get_rect() in tiles[0]
+	if tile_dimensions == Vector2.ZERO:
 		var t = x.to_node(tiles.values()[0])
 		var sprite = _find_sprite(t)
 		assert(
 			sprite != null,
-			'The Grid tile size is unknown. tile_x and tile_y were not given on init and tiles[0] doesn\'t contain a Sprite'
+			'The Grid tile size is unknown. tile_dimensions.x and tile_dimensions.y were not given on init and tiles[0] doesn\'t contain a Sprite'
 		)
 		var cell_rect = sprite.get_rect()
 		t.free()
-		tile_x = abs(cell_rect.position.x) + abs(cell_rect.end.x)
-		tile_y = abs(cell_rect.position.y) + abs(cell_rect.end.y)
+		tile_dimensions.x = abs(cell_rect.position.x) + abs(cell_rect.end.x)
+		tile_dimensions.y = abs(cell_rect.position.y) + abs(cell_rect.end.y)
 
 	# row/col lut
 	col_lut = []
 	row_lut = []
 	g = []
-	for i in row_max:
+	for i in dimensions.y:
 		row_lut.push_back([])
-	for i in col_max:
+	for i in dimensions.x:
 		col_lut.push_back([])
 
 	var y_coord = 0
-	for i in row_max:
+	for i in dimensions.y:
 		var x_coord = 0
-		for j in col_max:
+		for j in dimensions.x:
 			row_lut[i].push_back(g.size())
 			col_lut[j].push_back(g.size())
 			g.push_back(
-				{position = Vector2(x_coord, y_coord), row = i, col = j}
+				{
+					position = Vector2(x_coord, y_coord),
+					grid_position = Vector2(j, i)
+				}
 			)
-			x_coord += tile_x
-		y_coord += tile_y
+			x_coord += tile_dimensions.x
+		y_coord += tile_dimensions.y
 
 	# diag lut
 	var inverted_col_0 = col_lut[0].duplicate()
@@ -178,29 +178,26 @@ func _ready():
 		g[i].tile_key = map[i]
 
 
-# instance a grid with `_col_max` columns and `_row_max` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
+# instance a grid with `_dimensions.x` columns and `_dimensions.y` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
 # Specify `_pattern` of tiles. A matrix of `tile_key`s that is repeated through the whole grid. \
 # Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
 # You can only specify either `_pattern` or `_distribution` \
-# `if _tile_x and _tile_y == -1`: \
+# `if _tile_dimensions == Vector2.ZERO`: \
 #		The size of the icon is inferred \
 # `else`: \
-#		It's up to you to assure that `_tile_x` and `_tile_y` are correct \
+#		It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
 # `args` are send through to `XScene.new()`, see XScene for documentation
 func _init(
-	_col_max: int,
-	_row_max: int,
+	_dimensions: Vector2,
 	_tiles,
 	_pattern := [],
 	_distribution = {},
-	_tile_x := -1,
-	_tile_y := -1,
+	_tile_dimensions := Vector2.ZERO,
 	_args := {}
 ):
-	col_max = _col_max
-	row_max = _row_max
+	dimensions = _dimensions
 
-	size = _col_max * _row_max
+	size = _dimensions.x * _dimensions.y
 
 	tiles = Dictionary(_tiles)
 
@@ -211,54 +208,71 @@ func _init(
 	pattern = _pattern
 	distribution = _distribution
 
-	tile_x = _tile_x
-	tile_y = _tile_y
+	tile_dimensions = _tile_dimensions
 
 	args = _args
 	args.count_start = 0
 
 
-# `location` can be `grid_index: int` or `{grid_index: int}` or `{row: int, col: int}` \
-# `grid_index` takes precedence over row/col \
-# it returns the corresponding `grid_index` as int
-func location_to_grid_index(location) -> int:
-	if location is int:
-		assert(location < size)
-		return location
-	if location is Dictionary:
-		if 'grid_index' in location:
-			assert(location.grid_index < size)
-			return location.grid_index
-		elif 'row' in location and 'col' in location:
-			assert(location.row < row_max)
-			assert(location.col < col_max)
-			return row_lut[location.row][location.col]
+# `partial_location` can be `grid_index: int` or `grid_position: Vector2` or `{grid_index: int}` or `{grid_position: Vector2}` or `{grid_index: int, grid_position: Vector2}` \
+# `grid_index` takes precedence over `grid_position` \
+# it returns the corresponding `location` `{grid_index: int, grid_position: Vector2}`
+func to_location(partial_location) -> Dictionary:
+	var location = {grid_index = 0, grid_position = Vector2.ZERO}
+	if partial_location is int:
+		assert(partial_location < size)
+		location.grid_index = partial_location
+		location.grid_position = g[partial_location].grid_position
+	elif partial_location is Vector2:
+		assert(
+			(
+				partial_location.x < dimensions.x
+				and partial_location.y < dimensions.y
+			)
+		)
+		location.grid_index = col_lut[partial_location.x][partial_location.y]
+		location.grid_position = partial_location
+	elif partial_location is Dictionary:
+		if 'grid_index' in partial_location:
+			assert(partial_location.grid_index is int)
+			assert(partial_location.grid_index < size)
+			location.grid_index = partial_location.grid_index
+			location.grid_position = g[partial_location.grid_index].grid_position
+		elif 'grid_position' in partial_location:
+			assert(partial_location.grid_position is Vector2)
+			assert(
+				(
+					partial_location.grid_position.x < dimensions.x
+					and partial_location.grid_position.y < dimensions.y
+				)
+			)
+			location.grid_index = col_lut[partial_location.grid_position.x][partial_location.grid_position.y]
+			location.grid_position = g[partial_location.grid_index].grid_position
 		else:
 			assert(
 				false,
-				'Grid: location Dictionary needs to have key "grid_index" or "row"  and "col"'
+				'Grid: partial_location Dictionary needs to have key "grid_index" or "grid_position"'
 			)
-			return -1
 	else:
 		assert(
 			false,
-			'Grid: location needs to be Dictionary or int'
+			'Grid: location needs to be grid_index: int or grid_position: Vector2 or partial_location: {grid_index:int} or {grid_position:Vector2}'
 		)
-		return -1
+	return location
 
 
-# change the tile at `location` \
-# `changes` can contain these keys: `{tile_key: int, state: int, location:{(grid_index: int) or (row: int, col: int)}, leave_behind: int}` \
+# change the tile at `partial_location` \
+# `changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
 # `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 # `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-# `if changes.location`: `move_tile()` is used to move to `changes.location`, also `changes.leave_behind` is passed to `move_tile()`
+# `if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()`
 # `args` are send through to XScene, see XScene for documentation
-func change_tile(location, changes: Dictionary, args := {}) -> void:
-	var grid_index = location_to_grid_index(location)
+func change_tile(partial_location, changes: Dictionary, args := {}) -> void:
+	var location = to_location(partial_location)
 	var d = {
 		tile_key = false,
 		state = false,
-		location = false,
+		partial_location = false,
 		leave_behind = false,
 	}
 	for k in changes:
@@ -268,60 +282,61 @@ func change_tile(location, changes: Dictionary, args := {}) -> void:
 				d.tile_key = true
 			'state':
 				d.state = true
-			'location':
-				d.location = true
+			'partial_location':
+				d.partial_location = true
 			'leave_behind':
 				d.leave_behind = true
-		g[grid_index][k] = changes[k]
+		g[location.grid_index][k] = changes[k]
 	if d.tile_key:
-		switch_tile(changes.location, changes.tile_key)
+		switch_tile(partial_location, changes.tile_key)
 	if d.state:
 		args.method_change = changes.state
-		x.change_scene(grid_index, args)
-	if d.location:
+		x.change_scene(location.grid_index, args)
+	if d.partial_location:
 		move_tile(
-			changes.location,
-			location,
+			changes.partial_location,
+			partial_location,
 			changes.leave_behind if d.leave_behind else null,
 			args
 		)
 
 
-# Switch the tile at `location` to the tile of `tile_key`. \
+# Switch the tile at `partial_location` to the tile of `tile_key`. \
 # The old tile is freed, no properties are kept, except the position. \
 # `args` are send through to XScene, see XScene for documentation
-func switch_tile(location, tile_key, args := {}) -> void:
-	var grid_index = location_to_grid_index(location)
+func switch_tile(partial_location, tile_key, args := {}) -> void:
+	var location = to_location(partial_location)
 	args.method_remove = x.FREE
-	x.x_add_scene(tiles[tile_key], grid_index, grid_index, args)
-	x.x(grid_index).position = g[grid_index].position
-	g[grid_index].tile_key = tile_key
+	x.x_add_scene(
+		tiles[tile_key], location.grid_index, location.grid_index, args
+	)
+	x.x(location.grid_index).position = g[location.grid_index].position
+	g[location.grid_index].tile_key = tile_key
 
 
-# Move the tile at `location_from` to `location_to`. \
-# `if leave_behind == null`: it performs a swap with the tile at `location_to` \
-# `else`: it uses `leave_behind` as a tile key for `switch_tile()` at `location_from` \
+# Move the tile at `partial_location_from` to `partial_location_to`. \
+# `if leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
+# `else`: it uses `leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
 # `args` are send through to XScene, see XScene for documentation
 func move_tile(
-	location_to: Dictionary,
-	location_from: Dictionary,
-	leave_behind = null,
-	args := {}
+	partial_location_to, partial_location_from, leave_behind = null, args := {}
 ) -> void:
-	var grid_index_to := location_to_grid_index(location_to)
-	var grid_index_from := location_to_grid_index(location_from)
+	var location_to := to_location(partial_location_to)
+	var location_from := to_location(partial_location_from)
 
-	var temp = x.x(grid_index_to).position
-	x.x(grid_index_to).position = x.x(grid_index_from).position
-	x.x(grid_index_from).position = temp
+	var temp = x.x(location_to.grid_index).position
+	x.x(location_to.grid_index).position = x.x(
+		location_from.grid_index
+	).position
+	x.x(location_from.grid_index).position = temp
 
-	x.swap_scene(grid_index_to, grid_index_from)
+	x.swap_scene(location_to.grid_index, location_from.grid_index)
 	if leave_behind != null:
 		assert(
 			leave_behind in tiles,
 			'Grid.move_tile: leave_behind must be null or key in Grid.tiles'
 		)
-		switch_tile({grid_index = grid_index_from}, leave_behind, args)
+		switch_tile(partial_location_from, leave_behind, args)
 
 
 # Makes an array of size `grid.size`, that maps `tile_key` from `grid.tiles` to `grid_index`, according to `_pattern`
@@ -343,10 +358,10 @@ func make_map_for_pattern(_pattern: Array) -> Array:
 			)
 			var cols = []
 			var rows = []
-			for c in col_max:
+			for c in dimensions.x:
 				if c % row.size() == j:
 					cols.push_back(c)
-			for r in row_max:
+			for r in dimensions.y:
 				if r % _pattern.size() == i:
 					rows.push_back(r)
 			for c in cols:
@@ -389,37 +404,45 @@ func make_map_for_distribution(_distribution) -> Array:
 	return map
 
 
-# get row indices and col indices around `location` depending on `distance` \
+# get row indices and col indices around `partial_location` depending on `distance` \
 # `if distance == -1`: get all rows/cols \
 # returns `{rows = {above: Array, below: Array}, cols = {left: Array, right: Array}}` \
 # the Arrays are ordered "closest to `location`" first
-func get_cols_rows_around(location, distance := -1) -> Dictionary:
-	var grid_index := location_to_grid_index(location)
+func get_cols_rows_around(partial_location, distance := -1) -> Dictionary:
+	var location := to_location(partial_location)
 	var rows := []
-	for i in row_max:
+	for i in dimensions.y:
 		rows.append(i)
 	var cols := []
-	for i in col_max:
+	for i in dimensions.x:
 		cols.append(i)
 
 	var around := {rows = {}, cols = {}}
 	var start
 	var end
 
-	start = 0 if distance == -1 else g[grid_index].row - distance
-	end = g[grid_index].row
+	start = 0 if distance == -1 else location.grid_position.y - distance
+	end = location.grid_position.y
 	around.rows.above = _slice(rows, start, end)
 
-	start = g[grid_index].row + 1
-	end = row_max if distance == -1 else g[grid_index].row + 1 + distance
+	start = location.grid_position.y + 1
+	end = (
+		dimensions.y
+		if distance == -1
+		else location.grid_position.y + 1 + distance
+	)
 	around.rows.below = _slice(rows, start, end)
 
-	start = 0 if distance == -1 else g[grid_index].col - distance
-	end = g[grid_index].col
+	start = 0 if distance == -1 else location.grid_position.x - distance
+	end = location.grid_position.x
 	around.cols.left = _slice(cols, start, end)
 
-	start = g[grid_index].col + 1
-	end = col_max if distance == -1 else g[grid_index].col + 1 + distance
+	start = location.grid_position.x + 1
+	end = (
+		dimensions.x
+		if distance == -1
+		else location.grid_position.x + 1 + distance
+	)
 	around.cols.right = _slice(cols, start, end)
 
 	around.rows.above.invert()
@@ -427,12 +450,12 @@ func get_cols_rows_around(location, distance := -1) -> Dictionary:
 	return around
 
 
-# returns an Array containing Arrays containing the `grid_indices` of the tiles in the next 'ring' around location \
+# returns an Array of Arrays containing the `grid_indices` of the tiles in the next 'ring' around `partial_location` \
 # `distance` determines how many rings are returned \
 # `if distance == -1`: it returns all rings
-func get_rings_around(location, distance := 1) -> Array:
-	var grid_index := location_to_grid_index(location)
-	var around := get_cols_rows_around(location, distance)
+func get_rings_around(partial_location, distance := 1) -> Array:
+	var location := to_location(partial_location)
+	var around := get_cols_rows_around(partial_location, distance)
 	var rings := []
 	var temp: Array
 	var array
@@ -441,10 +464,13 @@ func get_rings_around(location, distance := 1) -> Array:
 
 	assert(
 		distance >= 0 or distance == -1,
-		'Grid.get_rings_around: distance must be >= 0 or == -1' + distance as String
+		(
+			'Grid.get_rings_around: distance must be >= 0 or == -1'
+			+ distance as String
+		)
 	)
 
-	var max_distance = max(col_max, row_max)
+	var max_distance = max(dimensions.x, dimensions.y)
 	var d: int
 	if distance > max_distance or distance == -1:
 		d = max_distance
@@ -459,11 +485,11 @@ func get_rings_around(location, distance := 1) -> Array:
 		if around.cols.left:
 			start = around.cols.left[min(i, around.cols.left.size() - 1)]
 		else:
-			start = g[grid_index].col
+			start = location.grid_position.x
 		if around.cols.right:
 			end = around.cols.right[min(i, around.cols.right.size() - 1)]
 		else:
-			end = g[grid_index].col
+			end = location.grid_position.x
 
 		if around.rows.above:
 			if i < around.rows.above.size():
@@ -480,11 +506,11 @@ func get_rings_around(location, distance := 1) -> Array:
 		if around.rows.above:
 			start = around.rows.above[min(i, around.rows.above.size() - 1)]
 		else:
-			start = g[grid_index].row
+			start = location.grid_position.y
 		if around.rows.below:
 			end = around.rows.below[min(i, around.rows.below.size() - 1)]
 		else:
-			end = g[grid_index].row
+			end = location.grid_position.y
 
 		if around.cols.left:
 			if i < around.cols.left.size():
@@ -503,16 +529,16 @@ func get_rings_around(location, distance := 1) -> Array:
 	return rings
 
 
-# returns an Array containing the `grid_indices` of the tiles in the same row and column as `location` \
+# returns an Array containing the `grid_indices` of the tiles in the same row and column as `partial_location` \
 # `if rings`: see `get_rings_around()`, but only with tiles in same row and column \
 # distance determines how many rings are returned \
 # `if distance == -1`: it returns all rings
-func get_orthogonal_neighbors(location, distance := 1, rings:= false) -> Array:
-	var grid_index := location_to_grid_index(location)
+func get_orthogonal_neighbors(partial_location, distance := 1, rings := false) -> Array:
+	var location := to_location(partial_location)
 	var four_neighbors := []
 	var offset: int
 
-	var max_distance = max(col_max, row_max)
+	var max_distance = max(dimensions.x, dimensions.y)
 	var d: int
 	if distance > max_distance or distance == -1:
 		d = max_distance
@@ -524,59 +550,83 @@ func get_orthogonal_neighbors(location, distance := 1, rings:= false) -> Array:
 		for i in d:
 			ring = []
 			offset = i + 1
-			if not g[grid_index].col - offset < 0:
+			if not location.grid_position.x - offset < 0:
 				ring.push_back(
-					row_lut[g[grid_index].row][g[grid_index].col - offset]
+					row_lut[location.grid_position.y][(
+						location.grid_position.x
+						- offset
+					)]
 				)
-			if not g[grid_index].col + offset > col_max - 1:
+			if not location.grid_position.x + offset > dimensions.x - 1:
 				ring.push_back(
-					row_lut[g[grid_index].row][g[grid_index].col + offset]
+					row_lut[location.grid_position.y][(
+						location.grid_position.x
+						+ offset
+					)]
 				)
-			if not g[grid_index].row - offset < 0:
+			if not location.grid_position.y - offset < 0:
 				ring.push_back(
-					col_lut[g[grid_index].col][g[grid_index].row - offset]
+					col_lut[location.grid_position.x][(
+						location.grid_position.y
+						- offset
+					)]
 				)
-			if not g[grid_index].row + offset > row_max - 1:
+			if not location.grid_position.y + offset > dimensions.y - 1:
 				ring.push_back(
-					col_lut[g[grid_index].col][g[grid_index].row + offset]
+					col_lut[location.grid_position.x][(
+						location.grid_position.y
+						+ offset
+					)]
 				)
 			if ring:
 				four_neighbors.push_back(ring)
 	else:
 		for i in d:
 			offset = i + 1
-			if not g[grid_index].col - offset < 0:
+			if not location.grid_position.x - offset < 0:
 				four_neighbors.push_back(
-					row_lut[g[grid_index].row][g[grid_index].col - offset]
+					row_lut[location.grid_position.y][(
+						location.grid_position.x
+						- offset
+					)]
 				)
-			if not g[grid_index].col + offset > col_max - 1:
+			if not location.grid_position.x + offset > dimensions.x - 1:
 				four_neighbors.push_back(
-					row_lut[g[grid_index].row][g[grid_index].col + offset]
+					row_lut[location.grid_position.y][(
+						location.grid_position.x
+						+ offset
+					)]
 				)
-			if not g[grid_index].row - offset < 0:
+			if not location.grid_position.y - offset < 0:
 				four_neighbors.push_back(
-					col_lut[g[grid_index].col][g[grid_index].row - offset]
+					col_lut[location.grid_position.x][(
+						location.grid_position.y
+						- offset
+					)]
 				)
-			if not g[grid_index].row + offset > row_max - 1:
+			if not location.grid_position.y + offset > dimensions.y - 1:
 				four_neighbors.push_back(
-					col_lut[g[grid_index].col][g[grid_index].row + offset]
+					col_lut[location.grid_position.x][(
+						location.grid_position.y
+						+ offset
+					)]
 				)
 
 	return four_neighbors
 
 
-# returns an Array containing the `grid_indices` of the tiles on the same diagonals as location \
+# returns an Array containing the `grid_indices` of the tiles on the same diagonals as `partial_location` \
 # `if rings`: see `get_rings_around()`, but only with tiles on same diagonals \
 # `distance` determines how many rings are returned \
 # `if distance == -1`: it returns all rings
-func get_diagonal_neighbors(location, distance := 1, rings:= false) -> Array:
-	var grid_index := location_to_grid_index(location)
+func get_diagonal_neighbors(partial_location, distance := 1, rings := false) -> Array:
+	var location := to_location(partial_location)
 	var four_neighbors := []
 	var offset: int
 	var index: int
 	var diag: Array
 
-	var max_distance = max(col_max, row_max)
+	var max_distance = max(dimensions.x, dimensions.y)
 	var d: int
 	if distance > max_distance or distance == -1:
 		d = max_distance
@@ -588,15 +638,15 @@ func get_diagonal_neighbors(location, distance := 1, rings:= false) -> Array:
 		for i in d:
 			ring = []
 			offset = i + 1
-			diag = rising_diag_lut[g[grid_index].rising_diag]
-			index = diag.bsearch(grid_index)
+			diag = rising_diag_lut[g[location.grid_index].rising_diag]
+			index = diag.bsearch(location.grid_index)
 			if not index - offset < 0:
 				ring.push_back(diag[index - offset])
 			if not index + offset > diag.size() - 1:
 				ring.push_back(diag[index + offset])
 
-			diag = falling_diag_lut[g[grid_index].falling_diag]
-			index = diag.bsearch(grid_index)
+			diag = falling_diag_lut[g[location.grid_index].falling_diag]
+			index = diag.bsearch(location.grid_index)
 			if not index - offset < 0:
 				ring.push_back(diag[index - offset])
 			if not index + offset > diag.size() - 1:
@@ -606,15 +656,15 @@ func get_diagonal_neighbors(location, distance := 1, rings:= false) -> Array:
 	else:
 		for i in d:
 			offset = i + 1
-			diag = rising_diag_lut[g[grid_index].rising_diag]
-			index = diag.bsearch(grid_index)
+			diag = rising_diag_lut[g[location.grid_index].rising_diag]
+			index = diag.bsearch(location.grid_index)
 			if not index - offset < 0:
 				four_neighbors.push_back(diag[index - offset])
 			if not index + offset > diag.size() - 1:
 				four_neighbors.push_back(diag[index + offset])
 
-			diag = falling_diag_lut[g[grid_index].falling_diag]
-			index = diag.bsearch(grid_index)
+			diag = falling_diag_lut[g[location.grid_index].falling_diag]
+			index = diag.bsearch(location.grid_index)
 			if not index - offset < 0:
 				four_neighbors.push_back(diag[index - offset])
 			if not index + offset > diag.size() - 1:
@@ -624,43 +674,61 @@ func get_diagonal_neighbors(location, distance := 1, rings:= false) -> Array:
 
 
 # combines `get_orthogonal_neighbors()` and `get_diagonal_neighbors()`
-func get_all_neighbors(location, distance := 1, rings:= false) -> Array:
+func get_all_neighbors(partial_location, distance := 1, rings := false) -> Array:
 	var eight_neighbors := []
 	if rings:
-		var dia = get_diagonal_neighbors(location, distance, rings)
-		var ortho = get_orthogonal_neighbors(location, distance, rings)
+		var dia = get_diagonal_neighbors(partial_location, distance, rings)
+		var ortho = get_orthogonal_neighbors(partial_location, distance, rings)
 		for i in ortho.size():
 			if i < dia.size():
 				eight_neighbors.append(dia[i] + ortho[i])
 			else:
 				eight_neighbors.append(ortho[i])
 	else:
-		eight_neighbors.append_array(get_diagonal_neighbors(location, distance))
-		eight_neighbors.append_array(get_orthogonal_neighbors(location, distance))
+		eight_neighbors.append_array(
+			get_diagonal_neighbors(partial_location, distance)
+		)
+		eight_neighbors.append_array(
+			get_orthogonal_neighbors(partial_location, distance)
+		)
 	return eight_neighbors
 
 
-# returns a location Dictionary, containing the differences between `start_location` and `end_location` \
-# `{grid_index:int, row:int, col:int}`
-func get_distance_between(start_location, end_location) -> Dictionary:
-	var start_grid_index := location_to_grid_index(start_location)
-	var end_grid_index := location_to_grid_index(end_location)
-	var distance := {grid_index = 0, row = 0, col = 0}
-	distance.grid_index = abs(end_grid_index - start_grid_index)
-	distance.row = abs(g[end_grid_index].row - g[start_grid_index].row)
-	distance.col = abs(g[end_grid_index].col - g[start_grid_index].col)
+# returns a location Dictionary, see `to_location()`, \
+# containing the differences between `partial_location_to` and `partial_location_from` \
+func get_distance_between(partial_location_to, partial_location_from) -> Dictionary:
+	var location_from := to_location(partial_location_from)
+	var location_to := to_location(partial_location_to)
+	var distance := {grid_index = 0, grid_position = Vector2.ZERO}
+	distance.grid_index = abs(location_to.grid_index - location_from.grid_index)
+	distance.grid_position.x = abs(
+		location_to.grid_position.x - location_from.grid_position.x
+	)
+	distance.grid_position.y = abs(
+		location_to.grid_position.y - location_from.grid_position.y
+	)
 	return distance
 
 
-# returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `start_location` and `end_location` \
+# returns a 1D Array containing the `grid_indices` of all tiles in the rectangle between `partial_location_to` and `partial_location_from` \
 # the order of the inputs does not matter
-func get_rect_between(start_location, end_location) -> Array:
-	var start_grid_index := location_to_grid_index(start_location)
-	var end_grid_index := location_to_grid_index(end_location)
-	var start_row = min(g[start_grid_index].row, g[end_grid_index].row)
-	var end_row = max(g[start_grid_index].row, g[end_grid_index].row)
-	var start_col = min(g[start_grid_index].col, g[end_grid_index].col)
-	var end_col = max(g[start_grid_index].col, g[end_grid_index].col)
+func get_rect_between(partial_location_to, partial_location_from) -> Array:
+	var location_from := to_location(partial_location_from)
+	var location_to := to_location(partial_location_to)
+
+	var start_col = min(
+		location_from.grid_position.x, location_to.grid_position.x
+	)
+	var end_col = max(
+		location_from.grid_position.x, location_to.grid_position.x
+	)
+	var start_row = min(
+		location_from.grid_position.y, location_to.grid_position.y
+	)
+	var end_row = max(
+		location_from.grid_position.y, location_to.grid_position.y
+	)
+
 	var rect := []
 
 	for row_index in range(start_row, end_row + 1):
@@ -685,7 +753,7 @@ func get_rect() -> Rect2:
 	var start = transform.origin
 	var end = (
 		last_tile.get_relative_transform_to_parent(self).origin
-		+ Vector2(tile_x, tile_y)
+		+ Vector2(tile_dimensions.x, tile_dimensions.y)
 	)
 	return Rect2(start, end)
 
@@ -708,15 +776,17 @@ func _find_sprite(parent: Node) -> Node:
 # depending on `enable_diag.rising_diag: bool` and `enable_diag.rising_diag: bool` \
 # Arrays contain `grid_index` of all tiles on the same rising/falling diagonal \
 # `grid_index` of the given `location` is excluded
-func _get_diagonals(location, enable_diag := {}) -> Dictionary:
-	var grid_index := location_to_grid_index(location)
+func _get_diagonals(partial_location, enable_diag := {}) -> Dictionary:
+	var location := to_location(partial_location)
 	var d := {}
 	var around := {
-		rows = {
-			above = g[grid_index].row, below = row_max - g[grid_index].row - 1
-		},
 		cols = {
-			left = g[grid_index].col, right = col_max - g[grid_index].col - 1
+			left = location.grid_position.x,
+			right = dimensions.x - location.grid_position.x - 1
+		},
+		rows = {
+			above = location.grid_position.y,
+			below = dimensions.y - location.grid_position.y - 1
 		},
 	}
 
@@ -733,12 +803,18 @@ func _get_diagonals(location, enable_diag := {}) -> Dictionary:
 		for i in min(around.rows.above, around.cols.right):
 			offset = i + 1
 			d.rising_diag.push_back(
-				row_lut[g[grid_index].row - offset][g[grid_index].col + offset]
+				row_lut[location.grid_position.y - offset][(
+					location.grid_position.x
+					+ offset
+				)]
 			)
 		for i in min(around.rows.below, around.cols.left):
 			offset = i + 1
 			d.rising_diag.push_back(
-				row_lut[g[grid_index].row + offset][g[grid_index].col - offset]
+				row_lut[location.grid_position.y + offset][(
+					location.grid_position.x
+					- offset
+				)]
 			)
 
 	if enable_diag.falling_diag:
@@ -746,12 +822,18 @@ func _get_diagonals(location, enable_diag := {}) -> Dictionary:
 		for i in min(around.rows.above, around.cols.left):
 			offset = i + 1
 			d.falling_diag.push_back(
-				row_lut[g[grid_index].row - offset][g[grid_index].col - offset]
+				row_lut[location.grid_position.y - offset][(
+					location.grid_position.x
+					- offset
+				)]
 			)
 		for i in min(around.rows.below, around.cols.right):
 			offset = i + 1
 			d.falling_diag.push_back(
-				row_lut[g[grid_index].row + offset][g[grid_index].col + offset]
+				row_lut[location.grid_position.y + offset][(
+					location.grid_position.x
+					+ offset
+				)]
 			)
 	return d
 
