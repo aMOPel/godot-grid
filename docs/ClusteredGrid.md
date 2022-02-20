@@ -6,8 +6,7 @@
 
 ## Description
 
-A Wrapper Class that creates a normal `Grid` and a `Grid` of Clusters for the
-normal `Grid`
+A Wrapper Class that creates a normal `Grid` and a `Grid` of Clusters for the normal `Grid`
 
 ## Property Descriptions
 
@@ -33,7 +32,7 @@ an empty `Grid` instance, where the tiles are the clusters of `grid`
 var enable_cluster_area: bool
 ```
 
-pass this in the `args` Dictionary to `_init()`,
+pass this in the `args` Dictionary to `_init()`, \
 to create a `CollisionPolygon2D` for every cluster under an `Area2D` in `cluster_grid`
 
 ## Method Descriptions
@@ -44,15 +43,15 @@ to create a `CollisionPolygon2D` for every cluster under an `Area2D` in `cluster
 func _init(_dimensions: Vector2, _tiles, args: Dictionary, _xscene_defaults: Dictionary)
 ```
 
-takes the same arguments as `Grid._init()`
-`args.cluster_dimensions: Vector2` must be given
-`_dimensions` has to be evenly divisible by `args.cluster_dimensions`
-if `args.enable_cluster_area`: `cluster_grid` is no longer empty
-but of the following structure:
-`cluster_grid`
-	\ |-`Area2D`
-	\   |-`XScene`
-	\   |-`CollisionPolygon2D`
-	\   |-`CollisionPolygon2D`
-	\   |-...
+takes the same arguments as `Grid._init()` \
+`args.cluster_dimensions: Vector2` must be given \
+`_dimensions` has to be evenly divisible by `args.cluster_dimensions` \
+if `args.enable_cluster_area`: `cluster_grid` is no longer empty \
+but of the following structure: \
+`cluster_grid` \
+	\ |-`Area2D` \
+	\   |-`XScene` \
+	\   |-`CollisionPolygon2D` \
+	\   |-`CollisionPolygon2D` \
+	\   |-... \
 with each `CollisionPolygon2D` representing a cluster and being a `shape_owner` under `Area2D`

@@ -36,14 +36,13 @@ It's supposed to be useful when you have some sort of rectangular grid based sys
 
 ## Performance
 
-Since every Tile is a Node (with potential children), you will get lags from 10k nodes upwards depending on the machine.
+Since every Tile is a Node (with potential children), you will get lags from 10k Nodes upwards depending on the machine.
 
 So this library is intended for comparativly small Grids.
 
 Some features just use static information and thus are quite fast (the look up tables).
-This includes the initial generation of Grid.
 
-But others generate Arrays depending on the input and can become quite sluggish, when those arrays get too big.
+But others generate Arrays depending on the input and can become quite sluggish, with growing dimensions of the grid.
 See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/README.md)
 
 Other Performance Tips:

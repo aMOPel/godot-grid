@@ -215,6 +215,8 @@ func to_node(s) -> Node:
 
 # sets undefined values to their respective values in `defaults`
 func parse_args(args: Dictionary) -> Dictionary:
+	if 'already_parsed' in args:
+		return args
 	var d := {
 		method_change = defaults.method_change,
 		method_add = defaults.method_add,
@@ -222,8 +224,6 @@ func parse_args(args: Dictionary) -> Dictionary:
 		deferred = defaults.deferred,
 		recursive_owner = defaults.recursive_owner,
 	}
-	if 'already_parsed' in args:
-		return args
 
 	for k in args:
 		if _check_type(k, args[k]):

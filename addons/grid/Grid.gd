@@ -26,12 +26,12 @@ class_name Grid, 'res://addons/grid/grid16.png'
 # number of cols/rows in the grid
 var dimensions: Vector2 setget _dont_set
 
-# Rect2 encompassing the whole grid
+# Rect2 encompassing the whole grid \
 # coordinates are local to the grid
 var rect: Rect2 setget _dont_set
 
 # polygon encompassing the whole grid \
-# 4 corners of the grid
+# 4 corners of the grid \
 # coordinates are local to the grid
 var polygon: PoolVector2Array setget _dont_set
 
@@ -276,14 +276,15 @@ func _ready():
 
 # instance a grid with `_dimensions.x` columns and `_dimensions.y` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
 # `_tiles` can be empty, then no Nodes will be added under the grid, but the luts are still generated \
+# values in `_tiles` can be PackagedScene/Node/Object, but Node is slow \
 # `var default_args = { pattern = [], distribution = {}, tile_dimensions = Vector2.ZERO, enable_area = false, cluster_dimensions = Vector2.ZERO, }` \
 # `args.pattern` is a matrix of `tile_key`s that is repeated through the whole grid. \
 # `args.distribution` is relative probability of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
 # You can only specify either `args.pattern` or `args.distribution` \
 # `if args.tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
 # `else`: It's up to you to assure that `args.tile_dimensions.x` and `args.tile_dimensions.y` are correct \
-# `if args.enable_area`: an `Area2D` for the whole Grid is added as a child
-# `if args.cluster_dimensions`: the cluster feature is enabled with the the specified cluster size
+# `if args.enable_area`: an `Area2D` for the whole Grid is added as a child \
+# `if args.cluster_dimensions`: the cluster feature is enabled with the the specified cluster size \
 # `xscene_defaults` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation \
 func _init(_dimensions: Vector2, _tiles, args:={}, _xscene_defaults := {}):
 	dimensions = _dimensions
@@ -410,8 +411,8 @@ func _parse_args(args: Dictionary) -> Dictionary:
 	return d
 
 
-# `arg` is possible key in `args`
-# `value` is its value
+# `arg` is possible key in `args` \
+# `value` is its value \
 # this checks if the `value` is of the right type and is valid for the key `arg` in `args`
 func _check_type(arg: String, value) -> bool:
 	match arg:
@@ -451,9 +452,9 @@ func switch_tile(partial_location, tile_key, args:={}, xscene_args := {}) -> voi
 # Move the tile at `partial_location_from` to `partial_location_to`. \
 # `if args.leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
 # `else`: it uses `args.leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
-# `args.save_node` is passed to `switch_tile()`
+# `args.save_node` is passed to `switch_tile()` \
 # `xscene_args` are send through to XScene, see XScene for documentation
-func move_tile(partial_location_to, partial_location_from, args:={leave_behind = null, save_node = true}, xscene_args := {}) -> void:
+func move_tile(partial_location_to, partial_location_from, args:={}, xscene_args := {}) -> void:
 	var location_to := to_location(partial_location_to)
 	var location_from := to_location(partial_location_from)
 	var d := _parse_args(args)
