@@ -2,11 +2,46 @@
 
 extends Node2D
 
+# TODO: turn array to poolintarray, actually PoolIntArray is passed by value, which makes its usage very awkward
+# DONE: area2d for clusters
+# DONE: Don't free tiles on switch, but keep them stopped under the same index. This could be done using the data dict in XScene.
+
+# TODO: Make XScene optional
+
+# [X] Grid.rect, Grid.poly, Grid.area and Grid.enable_area, 
+# [X] proxy root for xscene,
+# [X] tiles are optional/empty grid possible,
+# [X] 'args' -> 'xscene_args'/'xscene_defaults'
+# [X] args Dictionary for Grid._init,
+# [X] change_tile() improved,
+# [X] switch_tile() new option: save_node that uses xscene alternative when switching,
+# [X] get_rect/poly/area for grid/tile/cluster
+# [X] _slice() is now static
+# [X] new static func _polygon_from_rect2()
+# [X] cluster_lut, cluster_dimensions, ClusteredGrid
+
 class_name Grid, 'res://addons/grid/grid16.png'
 
 # dimensions of the grid \
 # number of cols/rows in the grid
-var dimensions: Vector2
+var dimensions: Vector2 setget _dont_set
+
+# Rect2 encompassing the whole grid
+# coordinates are local to the grid
+var rect: Rect2 setget _dont_set
+
+# polygon encompassing the whole grid \
+# 4 corners of the grid
+# coordinates are local to the grid
+var polygon: PoolVector2Array setget _dont_set
+
+# pass this in the `args` Dictionary to `_init()`, to enable the `Grid.area` property
+var enable_area: bool setget _dont_set
+
+# `Area2D` with `CollisionPolygon2D` child with `.polygon == Grid.polygon` \
+# pass `enable_area` in the `args` Dictionary to `_init()`, to enable this property \
+# when enabled, `area` gets added as a child Node to the grid
+var area: Area2D setget _dont_set
 
 # pattern of `tile_key`s that is applied to the grid \
 # setting this variable is expensive as it resets the whole grid
@@ -22,27 +57,35 @@ var distribution setget _set_distribution
 var map: Array setget _set_map
 
 # number of tiles in grid
-var size: int
+var size: int setget _dont_set
 
 # dimensions of an individual tile \
 # using normal coordinates, not grid coordinates
-var tile_dimensions: Vector2
+var tile_dimensions: Vector2 setget _dont_set
+
+# dimensions of an individual cluster \
+# using grid coordinates, so the unit is 'tiles'
+var cluster_dimensions: Vector2 setget _dont_set
+
+# groups indices of clusters together for easy access, since they are constant \
+# Array of Arrays containing `grid_indices`
+var cluster_lut: Array setget _dont_set
 
 # groups indices of rows together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
-var row_lut: Array
+var row_lut: Array setget _dont_set
 
 # groups indices of columns together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
-var col_lut: Array
+var col_lut: Array setget _dont_set
 
 # groups indices of falling diagonals together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
-var falling_diag_lut: Array
+var falling_diag_lut: Array setget _dont_set
 
 # groups indices of rising diagonals together for easy access, since they are constant \
 # Array of Arrays containing `grid_indices`
-var rising_diag_lut: Array
+var rising_diag_lut: Array setget _dont_set
 
 # holds information for all tiles in the grid \
 # `g` at `grid_index` is `{position: Vector2, tile_key: int/string, grid_position: Vector2, rising_diag: int, falling_diag:int}`
@@ -52,14 +95,14 @@ var g: Array setget _dont_set
 var tiles := {}
 
 # defaults for `XScene.defaults`, only set once in `_ready()`
-var args: Dictionary setget _dont_set
+var xscene_defaults: Dictionary setget _dont_set
 
 # instance of `XScene`, managing all tiles of the grid
-var x: XScene
+var x: XScene setget _dont_set
 
 
 func _dont_set(a) -> void:
-	assert(false, 'Grid: do not set g property manually')
+	assert(false, 'Grid: do not set this property manually, value: ' + a as String)
 
 
 func _set_pattern(new: Array) -> void:
@@ -79,7 +122,15 @@ func _set_map(new: Array) -> void:
 
 
 func _ready():
-	x = XScene.new(self, false, args)
+
+	if 'x_root' in xscene_defaults and xscene_defaults.x_root is Node:
+		var root = xscene_defaults.x_root
+		xscene_defaults.erase('x_root')
+		add_child(root)
+		x = XScene.new(root, false, xscene_defaults)
+	else:
+		x = XScene.new(self, false, xscene_defaults)
+
 	# if tile_dimensions.x and tile_dimensions.y are not given on init, they are inferred from Sprite.get_rect() in tiles[0]
 	if tile_dimensions == Vector2.ZERO:
 		var t = x.to_node(tiles.values()[0])
@@ -90,8 +141,8 @@ func _ready():
 		)
 		var cell_rect = sprite.get_rect()
 		t.free()
-		tile_dimensions.x = abs(cell_rect.position.x) + abs(cell_rect.end.x)
-		tile_dimensions.y = abs(cell_rect.position.y) + abs(cell_rect.end.y)
+		tile_dimensions.x = abs(cell_rect.position.x) + abs(cell_rect.size.x)
+		tile_dimensions.y = abs(cell_rect.position.y) + abs(cell_rect.size.y)
 
 	# row/col lut
 	col_lut = []
@@ -116,6 +167,34 @@ func _ready():
 			)
 			x_coord += tile_dimensions.x
 		y_coord += tile_dimensions.y
+
+	# cluster lut
+	if cluster_dimensions != Vector2.ZERO:
+		var cluster_count = Vector2(
+			ceil(dimensions.x / cluster_dimensions.x),
+			ceil(dimensions.y / cluster_dimensions.y)
+			)
+		var start: int
+		var end: int
+		var end_x: int
+		var end_y: int
+		for i in cluster_count.y:
+			for j in cluster_count.x:
+			
+				start = col_lut[(j*cluster_dimensions.x)][(i*cluster_dimensions.y)]
+				if j == cluster_count.x-1:
+					end_x = -1
+				else:
+					end_x = (j+1)*(cluster_dimensions.x)-1
+				if i == cluster_count.y-1:
+					end_y = -1
+				else:
+					end_y = (i+1)*(cluster_dimensions.y)-1
+				end = col_lut[end_x][end_y]
+				cluster_lut.append(get_rect_between(start, end))
+				for grid_index in cluster_lut[-1]:
+					g[grid_index].cluster = cluster_lut.size() - 1
+
 
 	# diag lut
 	var inverted_col_0 = col_lut[0].duplicate()
@@ -169,46 +248,74 @@ func _ready():
 		rising_diag_lut.push_back(temp)
 
 	# init
-	map = []
-	if pattern:
-		map = make_map_for_pattern(pattern)
-	elif distribution:
-		map = make_map_for_distribution(distribution)
-	else:
-		for i in size:
-			map.push_back(tiles.keys()[0])
+	if tiles:
+		map = []
+		if pattern:
+			map = make_map_for_pattern(pattern)
+		elif distribution:
+			map = make_map_for_distribution(distribution)
+		else:
+			for i in size:
+				map.push_back(tiles.keys()[0])
 
-	for i in size:
-		x.add_scene(tiles[map[i]], i)
-		x.x(i).position += g[i].position
-		g[i].tile_key = map[i]
+		for i in size:
+			x.add_scene(tiles[map[i]], i)
+			var n = x.x(i)
+			n.position += g[i].position
+			g[i].tile_key = map[i]
+
+	# collision shapes
+	rect = _get_rect()
+	polygon = _get_polygon()
+
+	if enable_area:
+		area = _get_area2d()
+		add_child(area)
+
 
 
 # instance a grid with `_dimensions.x` columns and `_dimensions.y` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
-# Specify `_pattern` of tiles. A matrix of `tile_key`s that is repeated through the whole grid. \
-# Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
-# You can only specify either `_pattern` or `_distribution` \
-# `if _tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
-# `else`: It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
-# `args` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation
-func _init(_dimensions: Vector2, _tiles, _pattern := [], _distribution = {}, _tile_dimensions := Vector2.ZERO, _args := {}):
+# `_tiles` can be empty, then no Nodes will be added under the grid, but the luts are still generated \
+# `var default_args = { pattern = [], distribution = {}, tile_dimensions = Vector2.ZERO, enable_area = false, cluster_dimensions = Vector2.ZERO, }` \
+# `args.pattern` is a matrix of `tile_key`s that is repeated through the whole grid. \
+# `args.distribution` is relative probability of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
+# You can only specify either `args.pattern` or `args.distribution` \
+# `if args.tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
+# `else`: It's up to you to assure that `args.tile_dimensions.x` and `args.tile_dimensions.y` are correct \
+# `if args.enable_area`: an `Area2D` for the whole Grid is added as a child
+# `if args.cluster_dimensions`: the cluster feature is enabled with the the specified cluster size
+# `xscene_defaults` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation \
+func _init(_dimensions: Vector2, _tiles, args:={}, _xscene_defaults := {}):
 	dimensions = _dimensions
 
 	size = _dimensions.x * _dimensions.y
 
 	tiles = Dictionary(_tiles)
+	var default_args = {
+		pattern = [],
+		distribution = {},
+		tile_dimensions = Vector2.ZERO,
+		enable_area = false,
+		cluster_dimensions = Vector2.ZERO,
+	}
+	for key in default_args:
+		if not key in args:
+			args[key] = default_args[key]
 
 	assert(
-		not (_pattern and _distribution),
+		not (args.pattern and args.distribution),
 		'you can only define either pattern or distribution'
 	)
-	pattern = _pattern
-	distribution = _distribution
+	pattern = args.pattern
+	distribution = args.distribution
 
-	tile_dimensions = _tile_dimensions
+	enable_area = args.enable_area
 
-	args = _args
-	args.count_start = 0
+	tile_dimensions = args.tile_dimensions
+	cluster_dimensions = args.cluster_dimensions
+
+	xscene_defaults = _xscene_defaults
+	xscene_defaults.count_start = 0
 
 
 # `partial_location` can be `grid_index: int` or `grid_position: Vector2` or `{grid_index: int}` or `{grid_position: Vector2}` or `{grid_index: int, grid_position: Vector2}` \
@@ -259,79 +366,109 @@ func to_location(partial_location) -> Dictionary:
 
 
 # change the tile at `partial_location` \
-# `changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
+# `changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location()}` \
 # `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 # `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-# `if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()` \
-# `args` are send through to XScene, see XScene for documentation
-func change_tile(partial_location, changes: Dictionary, args := {}) -> void:
+# `if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location` \
+# `args` are send through to `move_tile()` and `switch_tile()` \
+# `xscene_args` are send through to XScene, see XScene for documentation
+func change_tile(partial_location, changes: Dictionary, args:={}, xscene_args := {}) -> void:
 	var location = to_location(partial_location)
-	var d = {
+	var d := _parse_args(args)
+	var change_present = {
 		tile_key = false,
 		state = false,
 		partial_location = false,
-		leave_behind = false,
 	}
 	for k in changes:
-		# this structure avoids repeated 'x in dict' calls
-		match k:
-			'tile_key':
-				d.tile_key = true
-			'state':
-				d.state = true
-			'partial_location':
-				d.partial_location = true
-			'leave_behind':
-				d.leave_behind = true
-		g[location.grid_index][k] = changes[k]
-	if d.tile_key:
-		switch_tile(partial_location, changes.tile_key)
-	if d.state:
-		args.method_change = changes.state
-		x.change_scene(location.grid_index, args)
-	if d.partial_location:
-		move_tile(
-			changes.partial_location,
-			partial_location,
-			changes.leave_behind if d.leave_behind else null,
-			args
-		)
+		if k in change_present:
+			change_present[k] = true
+		else:
+			print_debug('Grid.change_tile: unrecognized key ' + k as String)
+
+	if change_present.tile_key:
+		switch_tile(partial_location, changes.tile_key, d, xscene_args)
+	if change_present.state:
+		xscene_args.method_change = changes.state
+		x.change_scene(location.grid_index, xscene_args)
+	if change_present.partial_location:
+		move_tile(changes.partial_location, partial_location, d, xscene_args)
+
+
+func _parse_args(args: Dictionary) -> Dictionary:
+	if 'already_parsed' in args:
+		return args
+	var d := {
+		leave_behind = null,
+		save_node = true,
+	}
+
+	for k in args:
+		if _check_type(k, args[k]):
+			d[k] = args[k]
+	d.already_parsed = true
+	return d
+
+
+# `arg` is possible key in `args`
+# `value` is its value
+# this checks if the `value` is of the right type and is valid for the key `arg` in `args`
+func _check_type(arg: String, value) -> bool:
+	match arg:
+		'leave_behind':
+			assert(value == null or value is String or value is int)
+		'save_node':
+			assert(value is bool)
+		_:
+			print_debug('Grid._check_type: unrecognized key ' + arg as String)
+			return false
+	return true
 
 
 # Switch the tile at `partial_location` to the tile of `tile_key`. \
-# The old tile is freed, no properties are kept, except the position. \
-# `args` are send through to XScene, see XScene for documentation
-func switch_tile(partial_location, tile_key, args := {}) -> void:
+# `if args.save_node`: the old tile/node is STOPPED (or HIDDEN) and kept, \
+# if you switch back to the old `tile_key` in the future, the saved node is reattach to the tree \
+# this is quicker but costs more memory \
+# `else`: The old tile is freed, no properties are kept, except the position. \
+# this is slower but costs less memory \
+# `xscene_args` are send through to XScene, see XScene for documentation
+func switch_tile(partial_location, tile_key, args:={}, xscene_args := {}) -> void:
 	var location = to_location(partial_location)
-	args.method_remove = x.FREE
-	x.x_add_scene(
-		tiles[tile_key], location.grid_index, location.grid_index, args
-	)
+	var d := _parse_args(args)
+	if d.save_node:
+		var current_tile_key = g[location.grid_index].tile_key
+		x.add_alternative(tiles[tile_key], tile_key, location.grid_index, xscene_args)
+		x.switch_alternative(current_tile_key, tile_key, location.grid_index)
+	else:
+		xscene_args.method_remove = x.FREE
+		x.x_add_scene(
+			tiles[tile_key], location.grid_index, location.grid_index, xscene_args
+		)
 	x.x(location.grid_index).position = g[location.grid_index].position
 	g[location.grid_index].tile_key = tile_key
 
 
 # Move the tile at `partial_location_from` to `partial_location_to`. \
-# `if leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
-# `else`: it uses `leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
-# `args` are send through to XScene, see XScene for documentation
-func move_tile(partial_location_to, partial_location_from, leave_behind = null, args := {}) -> void:
+# `if args.leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
+# `else`: it uses `args.leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
+# `args.save_node` is passed to `switch_tile()`
+# `xscene_args` are send through to XScene, see XScene for documentation
+func move_tile(partial_location_to, partial_location_from, args:={leave_behind = null, save_node = true}, xscene_args := {}) -> void:
 	var location_to := to_location(partial_location_to)
 	var location_from := to_location(partial_location_from)
+	var d := _parse_args(args)
 
 	var temp = x.x(location_to.grid_index).position
-	x.x(location_to.grid_index).position = x.x(
-		location_from.grid_index
-	).position
+	x.x(location_to.grid_index).position = x.x(location_from.grid_index).position
 	x.x(location_from.grid_index).position = temp
 
 	x.swap_scene(location_to.grid_index, location_from.grid_index)
-	if leave_behind != null:
+	if d.leave_behind != null:
 		assert(
-			leave_behind in tiles,
+			d.leave_behind in tiles,
 			'Grid.move_tile: leave_behind must be null or key in Grid.tiles'
 		)
-		switch_tile(partial_location_from, leave_behind, args)
+		switch_tile(partial_location_from, args.leave_behind, args, xscene_args)
 
 
 # Makes an array of size `grid.size`, that maps `tile_key` from `grid.tiles` to `grid_index`, according to `_pattern`
@@ -741,16 +878,71 @@ func get_tiles_by_tile_key(_tile_key) -> Array:
 	return ts
 
 
-# create a `Rect2` encompassing the whole grid \
-# it uses coordinates local to the grid
-func get_rect() -> Rect2:
-	var last_tile = x.x(size - 1)
-	var start = transform.origin
-	var end = (
-		last_tile.get_relative_transform_to_parent(self).origin
-		+ Vector2(tile_dimensions.x, tile_dimensions.y)
-	)
-	return Rect2(start, end)
+# return a `Rect2` encompassing the whole grid \
+# it uses coordinates local to the grid \
+# if you rotate/scale the grid, this Rect2 wont reflect that transformation \
+# and since Rect2 can't be properly converted to global coordinates, it can't be used for intersections in that case
+func _get_rect() -> Rect2:
+	var rect_pos = transform.origin
+	var rect_size = g[-1].position + tile_dimensions
+	return Rect2(rect_pos, rect_size)
+
+
+# return a polygon (rectangle) of the grid represented as the 4 corner points in a `PoolVector2Array` \
+# it uses coordinates local to the grid \
+# applying `Grid.to_global()` to the Vectors in this array will properly transform the polygon 
+func _get_polygon() -> PoolVector2Array:
+	return _polygon_from_rect2(_get_rect())
+
+
+# return an `Area2D` (rectangle) of the grid \
+# it uses coordinates local to the grid \
+# applying `Grid.to_global()` to the Vectors in this array will properly transform the polygon 
+func _get_area2d() -> Area2D:
+	var coll_poly = CollisionPolygon2D.new()
+	coll_poly.polygon = _get_polygon()
+	var area = Area2D.new()
+	area.add_child(coll_poly)
+	area.position = position
+	return area
+
+
+# return a `Rect2` encompassing the cluster at `cluster_index` \
+# it uses coordinates local to the grid \
+# if you rotate/scale the grid, this Rect2 wont reflect that transformation \
+# and since Rect2 can't be properly converted to global coordinates, it can't be used for intersections in that case
+# func _get_rect_of_cluster(cluster_index: int) -> Rect2:
+# 	assert(cluster_lut and cluster_index < cluster_lut.size())
+# 	var rect_pos = g[cluster_lut[cluster_index][0]].position
+# 	var rect_size = g[cluster_lut[cluster_index][-1]].position + tile_dimensions
+# 	return Rect2(rect_pos, rect_size)
+
+
+# return a polygon (rectangle) of the cluster at `cluster_index` represented as the 4 corner points in a `PoolVector2Array` \
+# it uses coordinates local to the grid \
+# applying `Grid.to_global()` to the Vectors in this array will properly transform the polygon 
+# func _get_polygon_of_cluster(cluster_index: int) -> PoolVector2Array:
+# 	return _polygon_from_rect2(_get_rect_of_cluster(cluster_index))
+
+
+# func _get_area2d_of_cluster(cluster_index: int) -> Area2D:
+# 	var coll_poly = CollisionPolygon2D.new()
+# 	coll_poly.polygon = _get_polygon_of_cluster(cluster_index)
+# 	var area = Area2D.new()
+# 	area.add_child(coll_poly)
+# 	area.position = position
+# 	return area
+
+
+func _get_rect_of_tile(grid_index: int) -> Rect2:
+	assert(0 <= grid_index and grid_index < size)
+	var rect_pos = g[grid_index].position
+	var rect_size = tile_dimensions
+	return Rect2(rect_pos, rect_size)
+
+
+func _get_polygon_of_tile(grid_index: int) -> PoolVector2Array:
+	return _polygon_from_rect2(_get_rect_of_tile(grid_index))
 
 
 # returns the first Node below parent including parent that is a Sprite
@@ -835,7 +1027,7 @@ func _get_diagonals(partial_location, enable_diag := {}) -> Dictionary:
 
 # this slices an array like Array.slize(), but with start incl, end excl. \
 # no negative indices supported
-func _slice(array: Array, start: int, end: int) -> Array:
+static func _slice(array: Array, start: int, end: int) -> Array:
 	var temp := []
 	if array.size() == 0:
 		return temp
@@ -845,3 +1037,11 @@ func _slice(array: Array, start: int, end: int) -> Array:
 	for i in range(start, end):
 		temp.append(array[i])
 	return temp
+
+
+static func _polygon_from_rect2(rect: Rect2) -> PoolVector2Array:
+	var a = rect.position
+	var b = Vector2(rect.end.x, rect.position.y)
+	var c = rect.end
+	var d = Vector2(rect.position.x, rect.end.y)
+	return PoolVector2Array([a,b,c,d])

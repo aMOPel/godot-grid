@@ -2,14 +2,13 @@
 # given `Node`.
 class_name XScene
 
-# DONE: put non critical arguments in dict
 # TODO: consider doing it all with fsm
 # TODO: sort out when to assert, print_debug, push_error
 # TODO: make option for auto_sync to add keys by count or by node.name
 
-extends Node
-
 # warnings-disable
+
+extends Node
 
 # enum with the scene state \
 # `ACTIVE` = 0 uses `add_child()` \
@@ -21,13 +20,16 @@ enum { ACTIVE, HIDDEN, STOPPED, FREE }
 # Dictionary that holds all indexed scenes and their state \
 # has either `count` or String as keys \
 # Eg. {1:{scene:[Node2D:1235], state:0}, abra:{scene:[Node2D:1239], state:1}}
-var scenes := {} setget _dont_set, get_scenes
+var scenes := {} setget _dont_set, _get_scenes
+
 # Array of keys of active scenes
-var active := [] setget _dont_set, get_active
+var active := [] setget _dont_set, _get_active
+
 # Array of keys of hidden scenes
-var hidden := [] setget _dont_set, get_hidden
+var hidden := [] setget _dont_set, _get_hidden
+
 # Array of keys of stopped scenes
-var stopped := [] setget _dont_set, get_stopped
+var stopped := [] setget _dont_set, _get_stopped
 
 # the Node below which this class will manipulate scenes
 var root: Node setget _dont_set
@@ -51,10 +53,11 @@ var _removing_scene := false setget _dont_set
 # `recursive_owner` = false, \
 # `method_add` = ACTIVE, \
 # `method_remove` = FREE, \
-# `count_start` = 1 | This is only applied when passing it to the _init() of XScene
-var defaults: Dictionary setget set_defaults
+# `method_change` = ACTIVE, \
+# `count_start` = 1 | This is only applied when passing it to the `_init()` of XScene
+var defaults: Dictionary setget _set_defaults
 
-# constant original default values, used for comparison in `set_defaults()` and to reset
+# constant original default values, used for comparison in `_set_defaults()` and to reset
 const _original_defaults := {
 	deferred = false,
 	recursive_owner = false,
@@ -75,7 +78,7 @@ var count: int setget _dont_set
 # `synchronize`: bool | default: false | wether to synchronize `scenes` with \
 # external additions to the tree \
 # `parameter_defaults`: Dictionary | default: {} | this is the only way to change `count_start` \
-# you can also pass partial dictionaries
+# you can also pass partial dictionaries \
 # eg `x = XScene.new($Node, false, {deferred = true, count_start = 0})`
 func _init(node: Node, synchronize := false, parameter_defaults := {}) -> void:
 	assert(
@@ -113,45 +116,29 @@ func _dont_set(a) -> void:
 	)
 
 
-# setting defaults Dictionary, any invalid keys or values will throw an error 
-func set_defaults(d: Dictionary) -> void:
+# setting defaults Dictionary
+func _set_defaults(d: Dictionary) -> void:
 	for k in d:
-		match k:
-			"method_add":
-				_check_type(k, d[k])
-			"method_remove":
-				_check_type(k, d[k])
-			"method_change":
-				_check_type(k, d[k])
-			"count_start":
-				_check_type(k, d[k])
-			"deferred":
-				_check_type(k, d[k])
-			"recursive_owner":
-				_check_type(k, d[k])
-			_:
-				print_debug(
-					"XScene.set_defaults: unrecognized key " + k as String
-				)
-		defaults[k] = d[k]
+		if _check_type(k, d[k]):
+			defaults[k] = d[k]
 
 
-func get_active() -> Array:
+func _get_active() -> Array:
 	_check_scenes(ACTIVE)
 	return active
 
 
-func get_hidden() -> Array:
+func _get_hidden() -> Array:
 	_check_scenes(HIDDEN)
 	return hidden
 
 
-func get_stopped() -> Array:
+func _get_stopped() -> Array:
 	_check_scenes(STOPPED)
 	return stopped
 
 
-func get_scenes() -> Dictionary:
+func _get_scenes() -> Dictionary:
 	_check_scenes()
 	return scenes
 
@@ -166,6 +153,8 @@ func x(key) -> Node:
 		return null
 
 
+# returns the `data` Dictionary in of `key` in `scenes`
+# the `data` Dictionary is not used by this plugin, but can be used to associate data with a scene
 func d(key) -> Dictionary:
 	if _check_scene(key):
 		return scenes[key].data
@@ -203,62 +192,58 @@ func xs(method = null) -> Array:
 	return a
 
 
-# uses PackedScene.instance() or Node.duplicate() on s
+# uses PackedScene.instance() or Node.duplicate() or Object.new() on s
 func to_node(s) -> Node:
 	var n: Node
 	if s is PackedScene:
 		n = s.instance()
 	elif s is Node:
 		n = s.duplicate()
+	elif s is Object:
+		n = s.new()
+		assert(
+			n is Node,
+			"XScene.to_node: if s is Object, s.new() has to be Node " + s.to_string()
+		)
 	else:
 		assert(
 			false,
-			"XScene.to_node: s must be PackedScene or Node " + s.to_string()
+			"XScene.to_node: s must be PackedScene or Node or Object" + s.to_string()
 		)
 	return n
 
 
-# sets undefined values to their respective values in `defaults`, `args.method` defaults to `defaults.method_add`
+# sets undefined values to their respective values in `defaults`
 func parse_args(args: Dictionary) -> Dictionary:
 	var d := {
-		method = defaults.method_add,
+		method_change = defaults.method_change,
 		method_add = defaults.method_add,
 		method_remove = defaults.method_remove,
 		deferred = defaults.deferred,
-		recursive_owner = defaults.recursive_owner
+		recursive_owner = defaults.recursive_owner,
 	}
+	if 'already_parsed' in args:
+		return args
+
 	for k in args:
-		match k:
-			'method_add':
-				_check_type(k, args[k])
-				d.method_add = args.method_add
-			'method_remove':
-				_check_type(k, args[k])
-				d.method_remove = args.method_remove
-			'method_change':
-				_check_type(k, args[k])
-				d.method_change = args.method_change
-			'deferred':
-				_check_type(k, args[k])
-				d.deferred = args.deferred
-			'recursive_owner':
-				_check_type(k, args[k])
-				d.recursive_owner = args.recursive_owner
-			_:
-				print_debug(
-					'XScene.parse_args: unrecognized key ' + k as String
-				)
+		if _check_type(k, args[k]):
+			d[k] = args[k]
+	d.already_parsed = true
 	return d
 
 
-# `args` takes `method_change` and `deferred` keys 
+# change state of `key` to any other state \
+# a wrapper around `show_scene()` and `remove_scene()` \
+# `args` takes `method_change` and `deferred` keys  \
 # these values default to their respective values in `defaults`
 func change_scene(key, args: Dictionary) -> void:
 	if not _check_scene(key):
 		push_error("XScene.change_scene: key invalid " + key as String)
 		return
 
-	var d = parse_args(args)
+	var d: Dictionary
+	d = parse_args(args)
+
 	var s = scenes[key]
 
 	if s.state == d.method_change:
@@ -283,10 +268,10 @@ func change_scene(key, args: Dictionary) -> void:
 # `STOPPED` only adds to `scenes` not to the tree \
 # `scene`: Node / PackagedScene \
 # `key`: `count` / String | default: `count` | key in `scenes` \
-# `method`: `ACTIVE` / `HIDDEN` / `STOPPED` | default: `ACTIVE` \
-# `deferred`: bool | default: false | whether to use call_deferred() for tree
+# `args.method_add`: `ACTIVE` / `HIDDEN` / `STOPPED` | default: `ACTIVE` \
+# `args.deferred`: bool | default: false | whether to use call_deferred() for tree
 # changes \
-# `recursive_owner`: bool | default: false | wether to recursively for all
+# `args.recursive_owner`: bool | default: false | wether to recursively for all
 # children of `scene` set the owner to `root`, this is useful for `pack_root()`
 func add_scene(new_scene, key = count, args := {}) -> void:
 	_check_type('key', key)
@@ -295,7 +280,8 @@ func add_scene(new_scene, key = count, args := {}) -> void:
 		"XScene.add_scene: key already exists " + key as String
 	)
 
-	var d := parse_args(args)
+	var d: Dictionary
+	d = parse_args(args)
 
 	var s: Node = to_node(new_scene)
 
@@ -330,7 +316,31 @@ func add_scene(new_scene, key = count, args := {}) -> void:
 			else:
 				s.hide()
 
-	scenes[key] = {scene = s, state = d.method_add, data = {}}
+	scenes[key] = {scene = s, state = d.method_add, alternatives = {}, data = {}}
+
+
+func switch_alternative(alternative_key_to, alternative_key_from, key = count, args:= {}) -> void:
+	var s = scenes[key]
+
+	var d: Dictionary
+	d = parse_args(args)
+
+	if d.method_remove == FREE:
+		d.method_remove = STOPPED
+	remove_scene(key, d)
+	s.alternatives[alternative_key_to] = s.scene
+
+	s.scene = s.alternatives[alternative_key_from]
+	show_scene(key, d)
+
+
+func add_alternative(scene, alternative_key, key = count, args:={}) -> void:
+	var s = scenes[key]
+
+	if not alternative_key in s.alternatives:
+		s.alternatives[alternative_key] = to_node(scene)
+
+
 
 
 # make `key` visible, and update `scenes` \
@@ -338,7 +348,7 @@ func add_scene(new_scene, key = count, args := {}) -> void:
 # if key is `HIDDEN` it uses `.show()` \
 # if key is `STOPPED` it uses `add_child()` and `.show()` \
 # `key` : int / String | default: `count` | key in `scenes` \
-# `deferred` : bool | default: false | whether to use `call_deferred()` for tree
+# `args.deferred` : bool | default: false | whether to use `call_deferred()` for tree
 # changes
 func show_scene(key = count, args := {}) -> void:
 	_check_type('key', key)
@@ -346,7 +356,8 @@ func show_scene(key = count, args := {}) -> void:
 		push_error("XScene.show_scene: key invalid " + key as String)
 		return
 
-	var d := parse_args(args)
+	var d: Dictionary
+	d = parse_args(args)
 
 	var s = scenes[key]
 
@@ -388,8 +399,8 @@ func show_scene(key = count, args := {}) -> void:
 # `STOPPED` uses `remove_child()` \
 # `FREE` uses `.free()` \
 # `key`: int / String | default: `count` | key in `scenes` \
-# `method`: `HIDDEN` / `STOPPED` / `FREE` | default: `FREE` \
-# `deferred`: bool | default: false | whether to use `call_deferred()` or
+# `args.method_remove`: `HIDDEN` / `STOPPED` / `FREE` | default: `FREE` \
+# `args.deferred`: bool | default: false | whether to use `call_deferred()` or
 # `queue_free()` for tree changes
 func remove_scene(key = count, args := {}) -> void:
 	_check_type('key', key)
@@ -397,7 +408,8 @@ func remove_scene(key = count, args := {}) -> void:
 		push_error("XScene.remove_scene: key invalid " + key as String)
 		return
 
-	var d := parse_args(args)
+	var d: Dictionary
+	d = parse_args(args)
 
 	var s = scenes[key]
 
@@ -427,6 +439,8 @@ func remove_scene(key = count, args := {}) -> void:
 					root.remove_child(s.scene)
 					s.state = STOPPED
 				_removing_scene = false
+				if 'to_alternative' in d:
+					s.alternatives[d.to_alternative] = s.scene
 		FREE:
 			_removing_scene = true
 			if d.deferred:
@@ -437,8 +451,8 @@ func remove_scene(key = count, args := {}) -> void:
 			scenes.erase(key)
 
 
-# use `show_scene(key_to, deferred)`
-# and `remove_scene(key_from, method_from, deferred)` \
+# use `show_scene(key_to, args)`
+# and `remove_scene(key_from, args)` \
 # `key_from`: int / String | default: null | use `remove_scene()` with this key, \
 # if null, the last active scene will be used, mind that the order of `active`
 # only depends on the order of `scenes`
@@ -451,8 +465,8 @@ func x_scene(key_to, key_from = null, args := {}) -> void:
 	remove_scene(key_from, args)
 
 
-# use `add_scene(scene_to, key_to, method_to, deferred, recursive_owner)`
-# and `remove_scene(key_from, method_from, deferred)`
+# use `add_scene(scene_to, key_to, args)`
+# and `remove_scene(key_from, args)`
 # `key_to`: `count` / String | default: `count` | use `add_scene()` with this key \
 # `key_from`: int / String | default: null | use `remove_scene()` with this key, \
 # if null, the last active scene will be used, mind that the order of `active`
@@ -466,6 +480,11 @@ func x_add_scene(scene_to, key_to = count, key_from = null, args := {}) -> void:
 	add_scene(scene_to, key_to, args)
 
 
+# swap the Dictionaries in `scenes` for these two keys \
+# `key_from`: int / String | default: null | use `remove_scene()` with this key, \
+# if null, the last active scene will be used, mind that the order of `active`
+# only depends on the order of `scenes`
+# hiding/stopping and then showing scenes won't change the order 
 func swap_scene(key_to = count, key_from = null) -> void:
 	if key_from == null:
 		key_from = self.active[-1]
@@ -522,7 +541,7 @@ func remove_scenes(keys: Array, args := {}) -> void:
 
 # pack `root` into `filepath` using `PackedScene.pack()` and `ResourceSaver.save()` \
 # this works together with the `recursive_owner` parameter of `add_scene()` \
-# mind that the recursive_owner parameter is only necessary for scenes
+# mind that the `recursive_owner` parameter is only necessary for scenes
 # constructed from script, a scene constructed in the editor already works
 func pack_root(filepath) -> void:
 	var scene = PackedScene.new()
@@ -647,7 +666,10 @@ func debug() -> void:
 	print(s)
 
 
-func _check_type(arg: String, value) -> void:
+# `arg` is possible key in `args`
+# `value` is its value
+# this checks if the `value` is of the right type and is valid for the key `arg` in `args`
+func _check_type(arg: String, value) -> bool:
 	match arg:
 		'key':
 			assert(
@@ -697,6 +719,14 @@ func _check_type(arg: String, value) -> void:
 					+ value as String
 				)
 			)
+		'to_alternative':
+			assert(
+				value is int or value is String,
+				(
+					"XScene._check_type: to_alternative needs to be int or String "
+					+ value as String
+				)
+			)
 		'count_start':
 			assert(
 				value is int and value >= 0,
@@ -707,3 +737,5 @@ func _check_type(arg: String, value) -> void:
 			)
 		_:
 			print_debug('XScene._check_type: unrecognized key ' + arg as String)
+			return false
+	return true

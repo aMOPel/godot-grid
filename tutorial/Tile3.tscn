@@ -2,7 +2,7 @@
 
 [ext_resource path="res://icon.png" type="Texture" id=2]
 
-[node name="Tile" type="Sprite"]
+[node name="Tile3" type="Sprite"]
 modulate = Color( 0.498039, 0.309804, 0.0156863, 1 )
 texture = ExtResource( 2 )
 centered = false

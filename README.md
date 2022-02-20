@@ -20,6 +20,9 @@ __Make patterns:__
 __Easily work with Columns, Rows and Diagonals:__
 ![](./tutorial/pics/readme_moving_neighbors.gif)
 
+__Clusters and Collision:__
+![](./tutorial/pics/collision_moving_example.gif)
+
 ## [Tutorial](./tutorial/README.md) (to see all Features)
 
 ## Applications
@@ -28,8 +31,7 @@ It's supposed to be useful when you have some sort of rectangular grid based sys
   * tetris
   * chess
   * grid based puzzles
-  * inventory maybe
-  * grid based turn based combat maybe
+  * grid based combat
   * ...
 
 ## Performance
@@ -39,11 +41,14 @@ Since every Tile is a Node (with potential children), you will get lags from 10k
 So this library is intended for comparativly small Grids.
 
 Some features just use static information and thus are quite fast (the look up tables).
+This includes the initial generation of Grid.
+
 But others generate Arrays depending on the input and can become quite sluggish, when those arrays get too big.
 See ['Access relative to a Tile' Chapter in the Tutorial](./tutorial/README.md)
 
-You could circumvent this limitation by implementing some form of clustering or culling for the tiles in order to only calculate whats on/close to the screen.
-See [Future Feature Ideas](#Future Feature Ideas)
+Other Performance Tips:
+* make sure to only put `PackedScenes` in `Grid.tiles`, because putting `Nodes` requires the use of `Nodes.duplicate()` which is slow
+* removing a lot of nodes with `XScene.remove_scene()`, tends to be slow, simply because freeing nodes or detaching them from the tree is expensive
 
 ## Installation
 
@@ -69,7 +74,7 @@ __Don't forget to enable it in your project settings!__
 
   * support for hex grid
   * support for triangular grid
-  * support for clustering/culling to stop tiles not on screen and improve performance for huge grids
+  * support for isometric grid
   * you can open an issue if you're missing a feature
 
 ## Attributions

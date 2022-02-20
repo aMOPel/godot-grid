@@ -7,3 +7,8 @@ modulate = Color( 0.862745, 0.0901961, 0.85098, 1 )
 texture = ExtResource( 2 )
 centered = false
 flip_v = true
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="Area2D"]
+polygon = PoolVector2Array( 0, 0, 64, 0, 64, 64, 0, 64 )

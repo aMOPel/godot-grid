@@ -19,6 +19,43 @@ var dimensions: Vector2
 dimensions of the grid \
 number of cols/rows in the grid
 
+### rect
+
+```gdscript
+var rect: Rect2
+```
+
+Rect2 encompassing the whole grid
+coordinates are local to the grid
+
+### polygon
+
+```gdscript
+var polygon: PoolVector2Array
+```
+
+polygon encompassing the whole grid \
+4 corners of the grid
+coordinates are local to the grid
+
+### enable\_area
+
+```gdscript
+var enable_area: bool
+```
+
+pass this in the `args` Dictionary to `_init()`, to enable the `Grid.area` property
+
+### area
+
+```gdscript
+var area: Area2D
+```
+
+`Area2D` with `CollisionPolygon2D` child with `.polygon == Grid.polygon` \
+pass `enable_area` in the `args` Dictionary to `_init()`, to enable this property \
+when enabled, `area` gets added as a child Node to the grid
+
 ### pattern
 
 ```gdscript
@@ -63,6 +100,24 @@ var tile_dimensions: Vector2
 
 dimensions of an individual tile \
 using normal coordinates, not grid coordinates
+
+### cluster\_dimensions
+
+```gdscript
+var cluster_dimensions: Vector2
+```
+
+dimensions of an individual cluster \
+using grid coordinates, so the unit is 'tiles'
+
+### cluster\_lut
+
+```gdscript
+var cluster_lut: Array
+```
+
+groups indices of clusters together for easy access, since they are constant \
+Array of Arrays containing `grid_indices`
 
 ### row\_lut
 
@@ -117,10 +172,10 @@ var tiles: Dictionary
 
 keys are `tile_key`, values are Node/PackedScene
 
-### args
+### xscene\_defaults
 
 ```gdscript
-var args: Dictionary
+var xscene_defaults: Dictionary
 ```
 
 defaults for `XScene.defaults`, only set once in `_ready()`
@@ -138,16 +193,20 @@ instance of `XScene`, managing all tiles of the grid
 ### \_init
 
 ```gdscript
-func _init(_dimensions: Vector2, _tiles, _pattern: Array, _distribution, _tile_dimensions: Vector2 = "(0, 0)", _args: Dictionary)
+func _init(_dimensions: Vector2, _tiles, args: Dictionary, _xscene_defaults: Dictionary)
 ```
 
 instance a grid with `_dimensions.x` columns and `_dimensions.y` rows. By default all tiles are visible and are set to the first tile in `_tiles` \
-Specify `_pattern` of tiles. A matrix of `tile_key`s that is repeated through the whole grid. \
-Specify relative probability `_distribution` of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
-You can only specify either `_pattern` or `_distribution` \
-`if _tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
-`else`: It's up to you to assure that `_tile_dimensions.x` and `_tile_dimensions.y` are correct \
-`args` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation
+`_tiles` can be empty, then no Nodes will be added under the grid, but the luts are still generated \
+`var default_args = { pattern = [], distribution = {}, tile_dimensions = Vector2.ZERO, enable_area = false, cluster_dimensions = Vector2.ZERO, }` \
+`args.pattern` is a matrix of `tile_key`s that is repeated through the whole grid. \
+`args.distribution` is relative probability of tiles by which they get randomly distributed through the grid. Can be Array or Dictionary. \
+You can only specify either `args.pattern` or `args.distribution` \
+`if args.tile_dimensions == Vector2.ZERO`: The size of the icon is inferred from first tile in `_tiles` \
+`else`: It's up to you to assure that `args.tile_dimensions.x` and `args.tile_dimensions.y` are correct \
+`if args.enable_area`: an `Area2D` for the whole Grid is added as a child
+`if args.cluster_dimensions`: the cluster feature is enabled with the the specified cluster size
+`xscene_defaults` are send through to `XScene.new()` at `Grid._ready()`, see XScene for documentation \
 
 ### to\_location
 
@@ -162,36 +221,42 @@ it returns the corresponding `location` `{grid_index: int, grid_position: Vector
 ### change\_tile
 
 ```gdscript
-func change_tile(partial_location, changes: Dictionary, args: Dictionary) -> void
+func change_tile(partial_location, changes: Dictionary, args: Dictionary, xscene_args: Dictionary) -> void
 ```
 
 change the tile at `partial_location` \
-`changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location(), leave_behind: int}` \
+`changes` can contain these keys: `{tile_key: int, state: int, partial_location: see to_location()}` \
 `if changes.tile_key`: `switch_tile()` is used to switch to `changes.tile_key` \
 `if changes.state`: `x.change_scene()` is used to change to `changes.state` \
-`if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location`, also `changes.leave_behind` is passed to `move_tile()` \
-`args` are send through to XScene, see XScene for documentation
+`if changes.partial_location`: `move_tile()` is used to move to `changes.partial_location` \
+`args` are send through to `move_tile()` and `switch_tile()` \
+`xscene_args` are send through to XScene, see XScene for documentation
 
 ### switch\_tile
 
 ```gdscript
-func switch_tile(partial_location, tile_key, args: Dictionary) -> void
+func switch_tile(partial_location, tile_key, args: Dictionary, xscene_args: Dictionary) -> void
 ```
 
 Switch the tile at `partial_location` to the tile of `tile_key`. \
-The old tile is freed, no properties are kept, except the position. \
-`args` are send through to XScene, see XScene for documentation
+`if args.save_node`: the old tile/node is STOPPED (or HIDDEN) and kept, \
+if you switch back to the old `tile_key` in the future, the saved node is reattach to the tree \
+this is quicker but costs more memory \
+`else`: The old tile is freed, no properties are kept, except the position. \
+this is slower but costs less memory \
+`xscene_args` are send through to XScene, see XScene for documentation
 
 ### move\_tile
 
 ```gdscript
-func move_tile(partial_location_to, partial_location_from, leave_behind = null, args: Dictionary) -> void
+func move_tile(partial_location_to, partial_location_from, args: Dictionary = true, xscene_args: Dictionary) -> void
 ```
 
 Move the tile at `partial_location_from` to `partial_location_to`. \
-`if leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
-`else`: it uses `leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
-`args` are send through to XScene, see XScene for documentation
+`if args.leave_behind == null`: it performs a swap with the tile at `partial_location_to` \
+`else`: it uses `args.leave_behind` as a `tile_key` for `switch_tile()` at `partial_location_from` \
+`args.save_node` is passed to `switch_tile()`
+`xscene_args` are send through to XScene, see XScene for documentation
 
 ### make\_map\_for\_pattern
 
@@ -285,12 +350,3 @@ func get_tiles_by_tile_key(_tile_key) -> Array
 ```
 
 get Array of tiles with the specified `tile_key`
-
-### get\_rect
-
-```gdscript
-func get_rect() -> Rect2
-```
-
-create a `Rect2` encompassing the whole grid \
-it uses coordinates local to the grid
